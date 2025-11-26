@@ -1,0 +1,58 @@
+{% extends "base1.html" %}
+
+{% block content %}
+<div class="hero-section text-center py-5">
+    <div class="container">
+        <h1 class="display-4 mb-4">AI-Powered Detection System</h1>
+        <p class="lead mb-4">Advanced computer vision for accident and pothole detection</p>
+        
+        <div class="row mt-5">
+            <div class="col-md-6 mb-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-car-crash"></i>
+                    </div>
+                    <h3>Accident Detection</h3>
+                    <p>Real-time accident detection using advanced YOLO models with high accuracy</p>
+                    <a href="{{ url_for('live_detection') }}?type=accident" class="btn btn-warning">Start Detection</a>
+                </div>
+            </div>
+            
+            <div class="col-md-6 mb-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-road"></i>
+                    </div>
+                    <h3>Pothole Detection</h3>
+                    <p>Identify road hazards and potholes for timely maintenance and safety</p>
+                    <a href="{{ url_for('live_detection') }}?type=pothole" class="btn btn-success">Start Detection</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-4 mb-3">
+                <div class="stats-card">
+                    <i class="fas fa-video"></i>
+                    <h4>Live Detection</h4>
+                    <p>Real-time camera feed analysis</p>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="stats-card">
+                    <i class="fas fa-upload"></i>
+                    <h4>Video Upload</h4>
+                    <p>Analyze pre-recorded videos</p>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="stats-card">
+                    <i class="fas fa-clipboard-list"></i>
+                    <h4>Complaint Management</h4>
+                    <p>Track and manage detections</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

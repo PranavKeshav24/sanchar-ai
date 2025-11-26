@@ -1,0 +1,346 @@
+{% extends "base1.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="text-center mb-4">Video Upload & Real-time Detection</h2>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="upload-card">
+                <h4><i class="fas fa-upload"></i> Upload Video</h4>
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="videoFile" class="form-label">Select Video File</label>
+                        <input class="form-control" type="file" id="videoFile" name="video" accept="video/*" required
+                               onchange="validateFile(this)">
+                        <div class="form-text">Supported formats: MP4, AVI, MOV, WMV, MKV, FLV (Max 50MB)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="detectionType" class="form-label">Detection Type</label>
+                        <select class="form-select" id="detectionType" name="detection_type" required>
+                            <option value="pothole">Pothole Detection</option>
+                            <option value="accident">Accident Detection</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100" id="uploadBtn">
+                        <i class="fas fa-upload"></i> Upload & Start Detection
+                    </button>
+                </form>
+            </div>
+            
+            <div id="processingControls" class="mt-4" style="display: none;">
+                <div class="control-card">
+                    <h5><i class="fas fa-cogs"></i> Processing Controls</h5>
+                    <div class="d-grid gap-2">
+                        <button id="pauseBtn" class="btn btn-warning" onclick="togglePause()">
+                            <i class="fas fa-pause"></i> Pause
+                        </button>
+                        <button id="restartBtn" class="btn btn-info" onclick="restartProcessing()">
+                            <i class="fas fa-redo"></i> Restart
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="results" class="mt-4" style="display: none;">
+                <h4><i class="fas fa-chart-bar"></i> Detection Results</h4>
+                <div id="resultsContent"></div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="video-container">
+                <div id="videoPlaceholder" class="video-placeholder">
+                    <i class="fas fa-video"></i>
+                    <p>Upload a video to start real-time detection</p>
+                </div>
+                <img id="videoStream" src="" style="display: none; width: 100%;" alt="Processed Video Stream">
+            </div>
+            
+            <div id="progressInfo" class="progress-info mt-3" style="display: none;">
+                <div class="progress mb-2">
+                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 0%"></div>
+                </div>
+                <div class="row text-center">
+                    <div class="col-4">
+                        <small>Progress: <span id="progressPercent">0%</span></small>
+                    </div>
+                    <div class="col-4">
+                        <small>Frame: <span id="currentFrame">0</span>/<span id="totalFrames">0</span></small>
+                    </div>
+                    <div class="col-4">
+                        <small>Detections: <span id="detectionCount">0</span></small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-card mt-4">
+                <h4><i class="fas fa-info-circle"></i> Real-time Detection</h4>
+                <p>Watch your video being processed in real-time with bounding boxes drawn around detected objects.</p>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-lightbulb"></i>
+                    <strong>Features:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>Real-time bounding box visualization</li>
+                        <li>Live progress tracking</li>
+                        <li>Automatic complaint logging</li>
+                        <li>Pause/restart controls</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentSessionId = null;
+    let statusInterval = null;
+    let isPaused = false;
+
+    function validateFile(input) {
+        const file = input.files[0];
+        const maxSize = 50 * 1024 * 1024; // 50MB
+        
+        if (file && file.size > maxSize) {
+            showNotification('File size exceeds 50MB limit. Please choose a smaller file.', 'danger');
+            input.value = '';
+            return false;
+        }
+        
+        return true;
+    }
+
+    function updateProgress(status, currentFrame = 0, totalFrames = 0, detections = 0) {
+        const progressBar = document.getElementById('progressBar');
+        const progressPercent = document.getElementById('progressPercent');
+        const currentFrameElem = document.getElementById('currentFrame');
+        const totalFramesElem = document.getElementById('totalFrames');
+        const detectionCountElem = document.getElementById('detectionCount');
+        
+        let progress = 0;
+        if (totalFrames > 0) {
+            progress = Math.round((currentFrame / totalFrames) * 100);
+        }
+        
+        progressBar.style.width = progress + '%';
+        progressPercent.textContent = progress + '%';
+        currentFrameElem.textContent = currentFrame;
+        totalFramesElem.textContent = totalFrames;
+        detectionCountElem.textContent = detections;
+        
+        // Update progress bar color based on status
+        progressBar.className = 'progress-bar progress-bar-striped';
+        if (status === 'completed') {
+            progressBar.classList.add('bg-success');
+            progressBar.classList.remove('progress-bar-animated');
+        } else if (isPaused) {
+            progressBar.classList.add('bg-warning');
+            progressBar.classList.remove('progress-bar-animated');
+        } else {
+            progressBar.classList.add('progress-bar-animated');
+            progressBar.classList.remove('bg-success', 'bg-warning');
+        }
+    }
+
+    function showVideoStream(sessionId) {
+        const videoPlaceholder = document.getElementById('videoPlaceholder');
+        const videoStream = document.getElementById('videoStream');
+        const progressInfo = document.getElementById('progressInfo');
+        const processingControls = document.getElementById('processingControls');
+        
+        videoPlaceholder.style.display = 'none';
+        videoStream.style.display = 'block';
+        progressInfo.style.display = 'block';
+        processingControls.style.display = 'block';
+        
+        // Start video stream
+        videoStream.src = `/video_stream/${sessionId}`;
+        
+        // Start status updates
+        statusInterval = setInterval(() => updateProcessingStatus(sessionId), 1000);
+    }
+
+    function updateProcessingStatus(sessionId) {
+        if (isPaused) return;
+        
+        fetch(`/get_processing_status/${sessionId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'completed') {
+                    clearInterval(statusInterval);
+                    updateProgress('completed', data.current_frame, data.total_frames, data.total_detections);
+                    showFinalResults(sessionId);
+                    showNotification('Video processing completed!', 'success');
+                } else if (data.status === 'processing') {
+                    updateProgress('processing', data.current_frame, data.total_frames, data.total_detections);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating status:', error);
+            });
+    }
+
+    function showFinalResults(sessionId) {
+        fetch(`/get_detection_results/${sessionId}`)
+            .then(response => response.json())
+            .then(data => {
+                const resultsDiv = document.getElementById('results');
+                const resultsContent = document.getElementById('resultsContent');
+                
+                let html = `<div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> Processing Complete!
+                </div>`;
+                
+                if (data.total_detections > 0) {
+                    html += `<div class="alert alert-info">
+                        <i class="fas fa-bell"></i> Found ${data.total_detections} detection(s) in the video
+                    </div>`;
+                    
+                    // Show detection statistics
+                    const detectionsByType = {};
+                    data.detections.forEach(det => {
+                        if (!detectionsByType[det.type]) {
+                            detectionsByType[det.type] = 0;
+                        }
+                        detectionsByType[det.type]++;
+                    });
+                    
+                    html += `<h6>Detection Summary:</h6>`;
+                    for (const [type, count] of Object.entries(detectionsByType)) {
+                        html += `<span class="badge ${type === 'accident' ? 'bg-danger' : 'bg-warning'} me-2">${type}: ${count}</span>`;
+                    }
+                    
+                } else {
+                    html += `<div class="alert alert-warning">
+                        <i class="fas fa-search"></i> No detections found in the video.
+                    </div>`;
+                }
+                
+                resultsContent.innerHTML = html;
+                resultsDiv.style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Error fetching results:', error);
+            });
+    }
+
+    function togglePause() {
+        isPaused = !isPaused;
+        const pauseBtn = document.getElementById('pauseBtn');
+        
+        if (isPaused) {
+            pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+            pauseBtn.className = 'btn btn-success';
+        } else {
+            pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+            pauseBtn.className = 'btn btn-warning';
+        }
+    }
+
+    function restartProcessing() {
+        if (currentSessionId) {
+            // Reload the video stream
+            const videoStream = document.getElementById('videoStream');
+            videoStream.src = `/video_stream/${currentSessionId}`;
+            
+            // Reset progress
+            updateProgress('processing', 0, 0, 0);
+            isPaused = false;
+            
+            const pauseBtn = document.getElementById('pauseBtn');
+            pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+            pauseBtn.className = 'btn btn-warning';
+            
+            showNotification('Video processing restarted', 'info');
+        }
+    }
+
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const uploadBtn = document.getElementById('uploadBtn');
+        
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+        
+        fetch('/upload_video', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.error || 'Upload failed'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                showNotification('Video uploaded successfully! Starting detection...', 'success');
+                currentSessionId = data.session_id;
+                showVideoStream(currentSessionId);
+            } else {
+                throw new Error(data.error || 'Upload failed');
+            }
+        })
+        .catch(error => {
+            console.error('Upload error:', error);
+            showNotification(`Upload failed: ${error.message}`, 'danger');
+        })
+        .finally(() => {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Start Detection';
+        });
+    });
+
+    // Clean up on page leave
+    window.addEventListener('beforeunload', function() {
+        if (statusInterval) {
+            clearInterval(statusInterval);
+        }
+    });
+</script>
+
+<style>
+.video-container {
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.video-placeholder {
+    color: #666;
+    text-align: center;
+    padding: 2rem;
+}
+
+.video-placeholder i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.control-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+.progress-info {
+    background: white;
+    padding: 1rem;
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}
