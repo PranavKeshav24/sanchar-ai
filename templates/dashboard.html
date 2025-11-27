@@ -2,64 +2,99 @@
 
 {% block content %}
 <div class="dashboard">
-    <h1>Welcome, {{ username }}!</h1>
-    
-    <div class="simulation-control-panel">
-        <h2>Simulation Configuration</h2>
-        <form id="simulation-config">
-            <div class="config-group">
-                <label for="vehicle-count">Number of Vehicles per Road:</label>
-                <input type="number" id="vehicle-count" name="vehicle_count" min="1" max="20" value="5">
-            </div>
-            
-            <div class="config-group">
-                <label>Enable AI Traffic Prediction:</label>
-                <input type="checkbox" id="ai-prediction" name="ai_prediction" checked>
-            </div>
-            
-            <div class="config-group">
-                <label>Enable Emergency Vehicle Priority:</label>
-                <input type="checkbox" id="emergency-priority" name="emergency_priority" checked>
-            </div>
-            
-            <button type="button" id="apply-config" class="btn btn-primary">Apply Configuration</button>
-        </form>
-    </div>
+    <h1>Welcome, {{ username }}! 👋</h1>
     
     <div class="dashboard-cards">
         <div class="card">
-            <h3>Simulation Controls</h3>
-            <p>Start, stop, and configure your simulation</p>
-            <a href="{{ url_for('simulation') }}" class="btn btn-primary">Go to Simulation</a>
-            <div class="simulation-status">
-                <p>Status: <span id="sim-status">Not Running</span></p>
-                <button id="start-sim" class="btn btn-success">Start Simulation</button>
-                <button id="stop-sim" class="btn btn-danger">Stop Simulation</button>
-            </div>
+            <h3>🗺️ Real-Time Map Dashboard</h3>
+            <p>View all detections, emergency vehicles, and traffic on an interactive map</p>
+            <a href="{{ url_for('map_dashboard') }}" class="btn btn-primary">Open Map Dashboard</a>
         </div>
         
         <div class="card">
-            <h3>Communication Types</h3>
-            <ul>
-                <li>V2V - Vehicle-to-Vehicle</li>
-                <li>V2I - Vehicle-to-Infrastructure</li>
-                <li>V2X - Vehicle-to-Everything</li>
-            </ul>
+            <h3>🚨 Emergency Vehicle Tracking</h3>
+            <p>Track ambulances and emergency vehicles with optimized routing</p>
+            <a href="{{ url_for('emergency_tracking') }}" class="btn btn-danger">Track Emergency Vehicles</a>
         </div>
         
         <div class="card">
-            <h3>Network Slicing</h3>
-            <p>Explore different network slices for optimized communication</p>
-            <ul>
-                <li>eMBB - Enhanced Mobile Broadband</li>
-                <li>URLLC - Ultra-Reliable Low-Latency Communication</li>
-                <li>mMTC - Massive Machine-Type Communication</li>
-            </ul>
+            <h3>🎯 Traffic Simulation</h3>
+            <p>Simulate traffic scenarios with AI-powered predictions</p>
+            <a href="{{ url_for('simulation') }}" class="btn btn-info">Go to Simulation</a>
+        </div>
+        
+        <div class="card">
+            <h3>🤖 AI Detection System</h3>
+            <p>Real-time pothole and accident detection using computer vision</p>
+            <a href="{{ url_for('main') }}" class="btn btn-success">AI Detection</a>
         </div>
     </div>
-    
-    <div class="real-time-stats">
-        <h2>Real-time Statistics</h2>
+
+    <div class="card mt-4">
+        <h3>📊 System Overview</h3>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <h4>Active Detections</h4>
+                <p id="total-detections">0</p>
+            </div>
+            <div class="stat-item">
+                <h4>Emergency Vehicles</h4>
+                <p id="emergency-count">0</p>
+            </div>
+            <div class="stat-item">
+                <h4>System Status</h4>
+                <p style="font-size: 1.5rem;">✅</p>
+            </div>
+            <div class="stat-item">
+                <h4>Coverage Area</h4>
+                <p style="font-size: 1.5rem;">🌍</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-cards mt-4">
+        <div class="card">
+            <h3>🎛️ Simulation Configuration</h3>
+            <form id="simulation-config">
+                <div class="form-group">
+                    <label for="vehicle-count">Vehicles per Road:</label>
+                    <input type="number" id="vehicle-count" name="vehicle_count" 
+                           min="1" max="20" value="5" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="ai-prediction" name="ai_prediction" checked>
+                        Enable AI Traffic Prediction
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="emergency-priority" name="emergency_priority" checked>
+                        Enable Emergency Vehicle Priority
+                    </label>
+                </div>
+                
+                <button type="button" id="apply-config" class="btn btn-primary">Apply Configuration</button>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h3>🚦 Quick Actions</h3>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <button id="start-sim" class="btn btn-success">▶️ Start Simulation</button>
+                <button id="stop-sim" class="btn btn-danger">⏹️ Stop Simulation</button>
+                <a href="{{ url_for('complaints') }}" class="btn btn-info">📋 View Complaints</a>
+            </div>
+            <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md);">
+                <p style="margin: 0; font-weight: 600;">Status: <span id="sim-status">Not Running</span></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <h3>📈 Real-time Statistics</h3>
         <div class="stats-grid">
             <div class="stat-item">
                 <h4>Active Vehicles</h4>
@@ -67,15 +102,37 @@
             </div>
             <div class="stat-item">
                 <h4>Average Speed</h4>
-                <p id="avg-speed">0 km/h</p>
+                <p><span id="avg-speed">0</span> km/h</p>
             </div>
             <div class="stat-item">
                 <h4>Network Latency</h4>
-                <p id="avg-latency">0 ms</p>
+                <p><span id="avg-latency">0</span> ms</p>
             </div>
             <div class="stat-item">
                 <h4>Signal Strength</h4>
-                <p id="avg-signal">0 dBm</p>
+                <p><span id="avg-signal">0</span> dBm</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <h3>ℹ️ System Features</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+            <div>
+                <h4 style="color: var(--accent-primary); margin-bottom: 0.5rem;">🗺️ Google Maps Integration</h4>
+                <p style="color: var(--text-secondary); margin: 0;">Real-time mapping with terrain and traffic layers</p>
+            </div>
+            <div>
+                <h4 style="color: var(--accent-primary); margin-bottom: 0.5rem;">🚑 Emergency Routing</h4>
+                <p style="color: var(--text-secondary); margin: 0;">Optimized routes with traffic-aware ETA</p>
+            </div>
+            <div>
+                <h4 style="color: var(--accent-primary); margin-bottom: 0.5rem;">🤖 AI Detection</h4>
+                <p style="color: var(--text-secondary); margin: 0;">Real-time pothole and accident detection</p>
+            </div>
+            <div>
+                <h4 style="color: var(--accent-primary); margin-bottom: 0.5rem;">📍 Geolocation</h4>
+                <p style="color: var(--text-secondary); margin: 0;">Precise location tracking and addressing</p>
             </div>
         </div>
     </div>
@@ -83,21 +140,106 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Load detection stats
+    loadDetectionStats();
+    loadEmergencyStats();
+    
     // Start simulation button
     document.getElementById('start-sim').addEventListener('click', function() {
         fetch('/start_simulation')
             .then(response => response.json())
             .then(data => {
-                document.getElementById('sim-status').textContent = 'Running';
+                document.getElementById('sim-status').textContent = 'Running ✅';
+                document.getElementById('sim-status').style.color = 'var(--accent-success)';
+                MapUtils.showNotification('Simulation started!', 'success');
                 updateStats();
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                console.error('Error:', error);
+                MapUtils.showNotification('Failed to start simulation', 'error');
+            });
     });
     
     // Stop simulation button
     document.getElementById('stop-sim').addEventListener('click', function() {
         fetch('/stop_simulation')
             .then(response => response.json())
+            .then(data => {
+                document.getElementById('sim-status').textContent = 'Stopped ⏹️';
+                document.getElementById('sim-status').style.color = 'var(--accent-danger)';
+                MapUtils.showNotification('Simulation stopped', 'info');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                MapUtils.showNotification('Failed to stop simulation', 'error');
+            });
+    });
+    
+    // Apply configuration
+    document.getElementById('apply-config').addEventListener('click', function() {
+        const vehicleCount = document.getElementById('vehicle-count').value;
+        const aiPrediction = document.getElementById('ai-prediction').checked;
+        const emergencyPriority = document.getElementById('emergency-priority').checked;
+        
+        fetch('/update_config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                vehicle_count: parseInt(vehicleCount),
+                ai_prediction: aiPrediction,
+                emergency_priority: emergencyPriority
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            MapUtils.showNotification('Configuration updated!', 'success');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            MapUtils.showNotification('Failed to update configuration', 'error');
+        });
+    });
+    
+    // Update stats periodically
+    function updateStats() {
+        fetch('/get_simulation_stats')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('active-vehicles').textContent = data.active_vehicles || 0;
+                document.getElementById('avg-speed').textContent = data.avg_speed || 0;
+                document.getElementById('avg-latency').textContent = data.avg_latency || 0;
+                document.getElementById('avg-signal').textContent = data.avg_signal || 0;
+            })
+            .catch(error => console.error('Error updating stats:', error));
+    }
+    
+    async function loadDetectionStats() {
+        try {
+            const response = await fetch('/api/complaints/all_with_location');
+            const data = await response.json();
+            document.getElementById('total-detections').textContent = data.complaints.length;
+        } catch (error) {
+            console.error('Error loading detection stats:', error);
+        }
+    }
+    
+    async function loadEmergencyStats() {
+        try {
+            const response = await fetch('/api/emergency/all_active');
+            const data = await response.json();
+            document.getElementById('emergency-count').textContent = data.vehicles.length;
+        } catch (error) {
+            console.error('Error loading emergency stats:', error);
+        }
+    }
+    
+    // Refresh stats every 5 seconds
+    setInterval(updateStats, 5000);
+    setInterval(loadDetectionStats, 10000);
+    setInterval(loadEmergencyStats, 10000);
+});
+</script>
+{% endblock %})
             .then(data => {
                 document.getElementById('sim-status').textContent = 'Stopped';
             })

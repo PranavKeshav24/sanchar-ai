@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Map Dashboard - Sanchar AI</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/modern-theme.css') }}"
+    />
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&libraries=places,geometry"></script>
+  </head>
+  <body>
+    <nav class="navbar">
+      <div class="nav-container">
+        <div class="nav-logo">
+          <h2>🚗 Sanchar AI</h2>
+        </div>
+        <div class="nav-menu">
+          <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+          <a href="{{ url_for('map_dashboard') }}" class="nav-link">Map View</a>
+          <a href="{{ url_for('emergency_tracking') }}" class="nav-link"
+            >Emergency Tracking</a
+          >
+          <a href="{{ url_for('complaints') }}" class="nav-link">Complaints</a>
+          <a href="{{ url_for('simulation') }}" class="nav-link">Simulation</a>
+          <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="dashboard">
+      <h1>Real-Time Traffic & Detection Map</h1>
+
+      <div class="dashboard-cards">
+        <div class="card">
+          <h3>📍 Detection Overview</h3>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <h4>Potholes</h4>
+              <p id="pothole-count">0</p>
+            </div>
+            <div class="stat-item">
+              <h4>Accidents</h4>
+              <p id="accident-count">0</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>🚨 Quick Actions</h3>
+          <div class="flex" style="flex-direction: column; gap: 1rem">
+            <button class="btn btn-primary" onclick="showCurrentLocation()">
+              📍 My Location
+            </button>
+            <button class="btn btn-info" onclick="showAllDetections()">
+              🗺️ Show All Detections
+            </button>
+            <button class="btn btn-success" onclick="findNearbyHospitals()">
+              🏥 Nearby Hospitals
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>🔍 Search Location</h3>
+          <div class="form-group">
+            <input
+              type="text"
+              id="addressSearch"
+              class="form-control"
+              placeholder="Enter address or location..."
+            />
+          </div>
+          <button class="btn btn-primary" onclick="searchAddress()">
+            Search
+          </button>
+        </div>
+      </div>
+
+      <div class="map-container">
+        <div id="map"></div>
+      </div>
+
+      <div class="card mt-4">
+        <h3>📊 Detection Details</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Location</th>
+                <th>Time</th>
+                <th>Confidence</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="detections-table">
+              <tr>
+                <td colspan="5" class="text-center">Loading detections...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <p>&copy; 2024 Sanchar AI - Smart Traffic Management System</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
+    <script>
+      let map;
+      let markers = [];
+      const DEFAULT_LAT = parseFloat("{{ default_lat }}");
+      const DEFAULT_LNG = parseFloat("{{ default_lng }}");
+
+      // Initialize map
+      function initializeMap() {
+        map = MapUtils.initMap("map", DEFAULT_LAT, DEFAULT_LNG, 13);
+        loadAllDetections();
+      }
+
+      // Load all detections from database
+      async function loadAllDetections() {
+        try {
+          const response = await fetch("/api/complaints/all_with_location");
+          const data = await response.json();
+
+          let potholeCount = 0;
+          let accidentCount = 0;
+
+          MapUtils.clearMarkers();
+          const tableBody = document.getElementById("detections-table");
+          tableBody.innerHTML = "";
+
+          data.complaints.forEach((complaint) => {
+            if (complaint.latitude && complaint.longitude) {
+              // Add marker to map
+              const icon = {
+                url:
+                  complaint.detection_type === "pothole"
+                    ? "https://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
+                    : "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+                scaledSize: new google.maps.Size(40, 40),
+              };
+
+              const infoContent = `
+                          <div style="padding: 10px; max-width: 250px;">
+                              <h4 style="margin: 0 0 10px 0; color: #333;">
+                                  ${complaint.detection_type.toUpperCase()}
+                              </h4>
+                              <p style="margin: 5px 0;"><strong>Confidence:</strong> ${(
+                                complaint.confidence * 100
+                              ).toFixed(1)}%</p>
+                              <p style="margin: 5px 0;"><strong>Time:</strong> ${
+                                complaint.timestamp
+                              }</p>
+                              <p style="margin: 5px 0;"><strong>Description:</strong> ${
+                                complaint.description || "Auto-detected"
+                              }</p>
+                              ${
+                                complaint.image_path
+                                  ? `<img src="/${complaint.image_path}" style="width: 100%; margin-top: 10px; border-radius: 5px;">`
+                                  : ""
+                              }
+                          </div>
+                      `;
+
+              MapUtils.addMarker(
+                complaint.latitude,
+                complaint.longitude,
+                complaint.detection_type,
+                icon,
+                infoContent
+              );
+
+              // Count detections
+              if (complaint.detection_type === "pothole") {
+                potholeCount++;
+              } else if (complaint.detection_type === "accident") {
+                accidentCount++;
+              }
+
+              // Add to table
+              const row = document.createElement("tr");
+              row.innerHTML = `
+                          <td>
+                              <span class="badge badge-${
+                                complaint.detection_type === "pothole"
+                                  ? "warning"
+                                  : "danger"
+                              }">
+                                  ${complaint.detection_type}
+                              </span>
+                          </td>
+                          <td>${
+                            complaint.address ||
+                            `${complaint.latitude.toFixed(
+                              4
+                            )}, ${complaint.longitude.toFixed(4)}`
+                          }</td>
+                          <td>${complaint.timestamp}</td>
+                          <td>${(complaint.confidence * 100).toFixed(1)}%</td>
+                          <td>
+                              <button class="btn btn-info" style="padding: 0.5rem 1rem; font-size: 0.875rem;"
+                                      onclick="focusOnLocation(${
+                                        complaint.latitude
+                                      }, ${complaint.longitude})">
+                                  View on Map
+                              </button>
+                          </td>
+                      `;
+              tableBody.appendChild(row);
+            }
+          });
+
+          // Update counts
+          document.getElementById("pothole-count").textContent = potholeCount;
+          document.getElementById("accident-count").textContent = accidentCount;
+
+          if (data.complaints.length === 0) {
+            tableBody.innerHTML =
+              '<tr><td colspan="5" class="text-center">No detections found</td></tr>';
+          }
+        } catch (error) {
+          console.error("Error loading detections:", error);
+          MapUtils.showNotification("Failed to load detections", "error");
+        }
+      }
+
+      // Show current location
+      async function showCurrentLocation() {
+        try {
+          const location = await MapUtils.getCurrentLocation();
+          map.setCenter(location);
+          map.setZoom(15);
+
+          MapUtils.addMarker(
+            location.lat,
+            location.lng,
+            "Your Location",
+            {
+              url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+              scaledSize: new google.maps.Size(40, 40),
+            },
+            '<div style="padding: 10px;"><h4 style="margin: 0;">You are here</h4></div>'
+          );
+
+          MapUtils.showNotification("Location found!", "success");
+        } catch (error) {
+          console.error("Error getting location:", error);
+          MapUtils.showNotification("Could not get your location", "error");
+        }
+      }
+
+      // Search address
+      async function searchAddress() {
+        const address = document.getElementById("addressSearch").value;
+        if (!address) {
+          MapUtils.showNotification("Please enter an address", "warning");
+          return;
+        }
+
+        try {
+          const response = await fetch("/api/geocode", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ address: address }),
+          });
+
+          const data = await response.json();
+
+          if (data.lat && data.lng) {
+            map.setCenter({ lat: data.lat, lng: data.lng });
+            map.setZoom(15);
+
+            MapUtils.addMarker(
+              data.lat,
+              data.lng,
+              data.formatted_address,
+              null,
+              `<div style="padding: 10px;"><h4 style="margin: 0;">${data.formatted_address}</h4></div>`
+            );
+
+            MapUtils.showNotification("Location found!", "success");
+          } else {
+            MapUtils.showNotification("Location not found", "error");
+          }
+        } catch (error) {
+          console.error("Error searching address:", error);
+          MapUtils.showNotification("Search failed", "error");
+        }
+      }
+
+      // Find nearby hospitals
+      async function findNearbyHospitals() {
+        try {
+          const location = await MapUtils.getCurrentLocation();
+
+          const response = await fetch("/api/nearby_hospitals", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lat: location.lat,
+              lng: location.lng,
+              radius: 5000,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.hospitals && data.hospitals.length > 0) {
+            data.hospitals.forEach((hospital) => {
+              MapUtils.addMarker(
+                hospital.lat,
+                hospital.lng,
+                hospital.name,
+                {
+                  url: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
+                  scaledSize: new google.maps.Size(40, 40),
+                },
+                `
+                              <div style="padding: 10px; max-width: 200px;">
+                                  <h4 style="margin: 0 0 5px 0;">${
+                                    hospital.name
+                                  }</h4>
+                                  <p style="margin: 0;">${hospital.address}</p>
+                                  ${
+                                    hospital.rating
+                                      ? `<p style="margin: 5px 0;">⭐ ${hospital.rating}</p>`
+                                      : ""
+                                  }
+                              </div>
+                          `
+              );
+            });
+
+            MapUtils.showNotification(
+              `Found ${data.hospitals.length} hospitals nearby`,
+              "success"
+            );
+          } else {
+            MapUtils.showNotification("No hospitals found nearby", "info");
+          }
+        } catch (error) {
+          console.error("Error finding hospitals:", error);
+          MapUtils.showNotification("Failed to find hospitals", "error");
+        }
+      }
+
+      // Show all detections
+      function showAllDetections() {
+        loadAllDetections();
+        map.setCenter({ lat: DEFAULT_LAT, lng: DEFAULT_LNG });
+        map.setZoom(13);
+        MapUtils.showNotification("Showing all detections", "info");
+      }
+
+      // Focus on specific location
+      function focusOnLocation(lat, lng) {
+        map.setCenter({ lat: lat, lng: lng });
+        map.setZoom(17);
+      }
+
+      // Initialize when page loads
+      window.addEventListener("load", initializeMap);
+
+      // Refresh detections every 30 seconds
+      setInterval(loadAllDetections, 30000);
+    </script>
+  </body>
+</html>

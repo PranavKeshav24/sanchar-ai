@@ -6,6 +6,7 @@ import random
 from datetime import datetime
 from data_loader import load_vehicle_data, get_random_vehicles
 from simulation import SimulationEngine, TrafficPredictor
+from maps_service import GoogleMapsService, EmergencyVehicleTracker
 import threading
 import time
 import numpy as np
@@ -29,6 +30,10 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 db = SQLAlchemy(app)
 
+# Initialize Google Maps Service
+maps_service = GoogleMapsService(app.config.get('GOOGLE_MAPS_API_KEY'))
+emergency_tracker = EmergencyVehicleTracker(maps_service)
+
 # User model
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -42,6 +47,19 @@ class User(db.Model):
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+# Emergency Vehicle model
+class EmergencyVehicle(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(db.String(50), unique=True, nullable=False)
+    vehicle_type = db.Column(db.String(50), nullable=False)
+    current_lat = db.Column(db.Float)
+    current_lng = db.Column(db.Float)
+    destination_lat = db.Column(db.Float)
+    destination_lng = db.Column(db.Float)
+    status = db.Column(db.String(20), default='active')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 # Initialize simulation engine and traffic predictor
 simulation_engine = SimulationEngine()
@@ -79,7 +97,10 @@ def init_db():
                   timestamp TEXT,
                   location TEXT,
                   description TEXT,
-                  image_path TEXT)''')
+                  image_path TEXT,
+                  latitude REAL,
+                  longitude REAL,
+                  address TEXT)''')
     conn.commit()
     conn.close()
 
@@ -674,6 +695,284 @@ def add_ambulance_west():
 def clear_all_vehicles():
     simulation_engine.clear_all_vehicles()
     return jsonify({'status': 'all vehicles cleared'})
+
+# ============ GOOGLE MAPS & REAL-TIME TRACKING ROUTES ============
+
+@app.route('/map_dashboard')
+def map_dashboard():
+    """Main map dashboard showing all real-time data"""
+    if 'user_id' not in session:
+        flash('Please log in to access this page', 'error')
+        return redirect(url_for('login'))
+    return render_template('map_dashboard.html', 
+                         api_key=app.config.get('GOOGLE_MAPS_API_KEY'),
+                         default_lat=app.config.get('DEFAULT_LAT'),
+                         default_lng=app.config.get('DEFAULT_LNG'))
+
+@app.route('/api/geocode', methods=['POST'])
+def geocode_address():
+    """Convert address to coordinates"""
+    data = request.get_json()
+    address = data.get('address')
+    
+    if not address:
+        return jsonify({'error': 'Address is required'}), 400
+    
+    result = maps_service.geocode_address(address)
+    if result:
+        return jsonify(result)
+    return jsonify({'error': 'Unable to geocode address'}), 404
+
+@app.route('/api/reverse_geocode', methods=['POST'])
+def reverse_geocode():
+    """Convert coordinates to address"""
+    data = request.get_json()
+    lat = data.get('lat')
+    lng = data.get('lng')
+    
+    if lat is None or lng is None:
+        return jsonify({'error': 'Latitude and longitude are required'}), 400
+    
+    address = maps_service.reverse_geocode(lat, lng)
+    return jsonify({'address': address})
+
+@app.route('/api/route', methods=['POST'])
+def get_route():
+    """Get route between two points"""
+    data = request.get_json()
+    origin = data.get('origin')
+    destination = data.get('destination')
+    
+    if not origin or not destination:
+        return jsonify({'error': 'Origin and destination are required'}), 400
+    
+    route = maps_service.get_route(origin, destination)
+    if route:
+        return jsonify(route)
+    return jsonify({'error': 'Unable to calculate route'}), 404
+
+@app.route('/api/nearby_hospitals', methods=['POST'])
+def get_nearby_hospitals():
+    """Find nearby hospitals"""
+    data = request.get_json()
+    lat = data.get('lat')
+    lng = data.get('lng')
+    radius = data.get('radius', 5000)
+    
+    if lat is None or lng is None:
+        return jsonify({'error': 'Latitude and longitude are required'}), 400
+    
+    hospitals = maps_service.get_nearby_places(lat, lng, 'hospital', radius)
+    return jsonify({'hospitals': hospitals})
+
+@app.route('/emergency_tracking')
+def emergency_tracking():
+    """Emergency vehicle tracking page"""
+    if 'user_id' not in session:
+        flash('Please log in to access this page', 'error')
+        return redirect(url_for('login'))
+    return render_template('emergency_tracking.html',
+                         api_key=app.config.get('GOOGLE_MAPS_API_KEY'))
+
+@app.route('/api/emergency/register', methods=['POST'])
+def register_emergency_vehicle():
+    """Register a new emergency vehicle"""
+    data = request.get_json()
+    
+    vehicle_id = data.get('vehicle_id')
+    vehicle_type = data.get('vehicle_type', 'ambulance')
+    current_location = data.get('current_location')
+    destination = data.get('destination')
+    
+    if not all([vehicle_id, current_location, destination]):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    vehicle = emergency_tracker.register_vehicle(
+        vehicle_id, vehicle_type, current_location, destination
+    )
+    
+    # Save to database
+    try:
+        current_coords = maps_service.geocode_address(current_location)
+        dest_coords = maps_service.geocode_address(destination)
+        
+        db_vehicle = EmergencyVehicle(
+            vehicle_id=vehicle_id,
+            vehicle_type=vehicle_type,
+            current_lat=current_coords['lat'] if current_coords else None,
+            current_lng=current_coords['lng'] if current_coords else None,
+            destination_lat=dest_coords['lat'] if dest_coords else None,
+            destination_lng=dest_coords['lng'] if dest_coords else None,
+            status='active'
+        )
+        db.session.add(db_vehicle)
+        db.session.commit()
+    except Exception as e:
+        print(f"Error saving to database: {e}")
+    
+    return jsonify(vehicle)
+
+@app.route('/api/emergency/update_location', methods=['POST'])
+def update_emergency_location():
+    """Update emergency vehicle location"""
+    data = request.get_json()
+    
+    vehicle_id = data.get('vehicle_id')
+    new_location = data.get('location')
+    
+    if not vehicle_id or not new_location:
+        return jsonify({'error': 'Vehicle ID and location are required'}), 400
+    
+    vehicle = emergency_tracker.update_vehicle_location(vehicle_id, new_location)
+    
+    if vehicle:
+        # Update database
+        try:
+            db_vehicle = EmergencyVehicle.query.filter_by(vehicle_id=vehicle_id).first()
+            if db_vehicle:
+                coords = maps_service.geocode_address(new_location)
+                if coords:
+                    db_vehicle.current_lat = coords['lat']
+                    db_vehicle.current_lng = coords['lng']
+                    db_vehicle.updated_at = datetime.utcnow()
+                    db.session.commit()
+        except Exception as e:
+            print(f"Error updating database: {e}")
+        
+        return jsonify(vehicle)
+    
+    return jsonify({'error': 'Vehicle not found'}), 404
+
+@app.route('/api/emergency/status/<vehicle_id>')
+def get_emergency_status(vehicle_id):
+    """Get emergency vehicle status"""
+    vehicle = emergency_tracker.get_vehicle_status(vehicle_id)
+    if vehicle:
+        return jsonify(vehicle)
+    return jsonify({'error': 'Vehicle not found'}), 404
+
+@app.route('/api/emergency/all_active')
+def get_all_active_emergency():
+    """Get all active emergency vehicles"""
+    vehicles = emergency_tracker.get_all_active_vehicles()
+    return jsonify({'vehicles': vehicles})
+
+@app.route('/api/emergency/complete/<vehicle_id>', methods=['POST'])
+def complete_emergency_journey(vehicle_id):
+    """Mark emergency vehicle journey as complete"""
+    emergency_tracker.complete_journey(vehicle_id)
+    
+    # Update database
+    try:
+        db_vehicle = EmergencyVehicle.query.filter_by(vehicle_id=vehicle_id).first()
+        if db_vehicle:
+            db_vehicle.status = 'completed'
+            db_vehicle.updated_at = datetime.utcnow()
+            db.session.commit()
+    except Exception as e:
+        print(f"Error updating database: {e}")
+    
+    return jsonify({'status': 'completed'})
+
+@app.route('/pothole_map')
+def pothole_map():
+    """Map view of detected potholes"""
+    if 'user_id' not in session:
+        flash('Please log in to access this page', 'error')
+        return redirect(url_for('login'))
+    
+    # Get all pothole complaints
+    conn = sqlite3.connect('complaints.db')
+    c = conn.cursor()
+    c.execute('SELECT * FROM complaints WHERE detection_type = "pothole" ORDER BY timestamp DESC')
+    potholes = c.fetchall()
+    conn.close()
+    
+    return render_template('pothole_map.html',
+                         api_key=app.config.get('GOOGLE_MAPS_API_KEY'),
+                         potholes=potholes)
+
+@app.route('/accident_map')
+def accident_map():
+    """Map view of reported accidents"""
+    if 'user_id' not in session:
+        flash('Please log in to access this page', 'error')
+        return redirect(url_for('login'))
+    
+    # Get all accident complaints
+    conn = sqlite3.connect('complaints.db')
+    c = conn.cursor()
+    c.execute('SELECT * FROM complaints WHERE detection_type = "accident" ORDER BY timestamp DESC')
+    accidents = c.fetchall()
+    conn.close()
+    
+    return render_template('accident_map.html',
+                         api_key=app.config.get('GOOGLE_MAPS_API_KEY'),
+                         accidents=accidents)
+
+@app.route('/api/complaints/add_with_location', methods=['POST'])
+def add_complaint_with_location():
+    """Add complaint with geolocation data"""
+    data = request.get_json()
+    
+    detection_type = data.get('detection_type')
+    description = data.get('description')
+    lat = data.get('latitude')
+    lng = data.get('longitude')
+    confidence = data.get('confidence', 1.0)
+    image_path = data.get('image_path')
+    
+    if not detection_type or not description:
+        return jsonify({'error': 'Detection type and description are required'}), 400
+    
+    # Get address from coordinates if provided
+    address = None
+    if lat and lng:
+        address = maps_service.reverse_geocode(lat, lng)
+    
+    conn = sqlite3.connect('complaints.db')
+    c = conn.cursor()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    c.execute('''INSERT INTO complaints 
+                 (detection_type, confidence, timestamp, location, description, image_path, latitude, longitude, address) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+              (detection_type, confidence, timestamp, address or "User Location", description, image_path, lat, lng, address))
+    complaint_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    
+    return jsonify({
+        'status': 'success',
+        'complaint_id': complaint_id,
+        'address': address
+    })
+
+@app.route('/api/complaints/all_with_location')
+def get_all_complaints_with_location():
+    """Get all complaints with location data for map display"""
+    conn = sqlite3.connect('complaints.db')
+    c = conn.cursor()
+    c.execute('SELECT * FROM complaints ORDER BY timestamp DESC')
+    complaints = c.fetchall()
+    conn.close()
+    
+    complaints_list = []
+    for complaint in complaints:
+        complaints_list.append({
+            'id': complaint[0],
+            'detection_type': complaint[1],
+            'confidence': complaint[2],
+            'timestamp': complaint[3],
+            'location': complaint[4],
+            'description': complaint[5],
+            'image_path': complaint[6],
+            'latitude': complaint[7] if len(complaint) > 7 else None,
+            'longitude': complaint[8] if len(complaint) > 8 else None,
+            'address': complaint[9] if len(complaint) > 9 else None
+        })
+    
+    return jsonify({'complaints': complaints_list})
 
 @app.route('/logout')
 def logout():

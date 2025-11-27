@@ -1,29 +1,119 @@
-{% extends "base.html" %}
-
-{% block content %}
+{% extends "base.html" %} {% block content %}
 <div class="hero">
-    <div class="hero-content">
-        <h1>6G Vehicle Communication Simulator</h1>
-        <p>Experience the future of vehicle-to-everything (V2X) communication with our advanced 6G simulation platform</p>
-        <div class="hero-buttons">
-            <a href="{{ url_for('login') }}" class="btn btn-primary">Get Started</a>
-            <a href="{{ url_for('register') }}" class="btn btn-secondary">Learn More</a>
-        </div>
+  <div class="hero-content">
+    <h1>Sanchar AI - Smart Traffic Management</h1>
+    <p>
+      Experience the future of intelligent traffic management with real-time
+      detection, emergency vehicle routing, and AI-powered predictions using
+      Google Maps integration
+    </p>
+    <div class="hero-buttons">
+      <a href="{{ url_for('login') }}" class="btn btn-primary">Get Started</a>
+      <a href="#features" class="btn btn-secondary">Learn More</a>
     </div>
+  </div>
 </div>
 
-<div class="features">
-    <div class="feature">
-        <h3>V2V Communication</h3>
-        <p>Vehicle-to-Vehicle communication for collision avoidance and cooperative driving</p>
+<div class="features" id="features">
+  <div class="feature">
+    <h3>🗺️ Real-Time Mapping</h3>
+    <p>
+      Interactive Google Maps integration with live traffic data, terrain
+      visualization, and geolocation services for accurate detection reporting
+    </p>
+  </div>
+  <div class="feature">
+    <h3>🚨 Emergency Routing</h3>
+    <p>
+      Optimized emergency vehicle routing with traffic-aware navigation,
+      automatic signal management, and real-time ETA calculations
+    </p>
+  </div>
+  <div class="feature">
+    <h3>🤖 AI Detection</h3>
+    <p>
+      Advanced computer vision for real-time pothole and accident detection with
+      automatic complaint generation and location tracking
+    </p>
+  </div>
+  <div class="feature">
+    <h3>🚦 Traffic Simulation</h3>
+    <p>
+      Sophisticated 6G V2X communication simulation with AI-powered traffic
+      prediction and emergency vehicle priority management
+    </p>
+  </div>
+  <div class="feature">
+    <h3>📍 Geolocation Services</h3>
+    <p>
+      Precise location tracking with address geocoding, reverse geocoding, and
+      nearby facility search (hospitals, police stations)
+    </p>
+  </div>
+  <div class="feature">
+    <h3>🌓 Modern Interface</h3>
+    <p>
+      Beautiful, responsive UI with light/dark theme support, real-time data
+      visualization, and intuitive navigation
+    </p>
+  </div>
+</div>
+
+<div
+  class="dashboard"
+  style="
+    background: var(--bg-primary);
+    padding: 4rem 2rem;
+    margin: 2rem auto;
+    max-width: 1400px;
+    border-radius: var(--radius-xl);
+  "
+>
+  <h2
+    style="text-align: center; margin-bottom: 3rem; color: var(--text-primary)"
+  >
+    System Capabilities
+  </h2>
+
+  <div
+    style="
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+    "
+  >
+    <div class="card">
+      <h3>🌍 Google Maps Integration</h3>
+      <ul style="color: var(--text-secondary); line-height: 2">
+        <li>Real-time traffic layer</li>
+        <li>Satellite & terrain views</li>
+        <li>Street view integration</li>
+        <li>Places API for facilities</li>
+        <li>Distance Matrix API</li>
+      </ul>
     </div>
-    <div class="feature">
-        <h3>V2I Communication</h3>
-        <p>Vehicle-to-Infrastructure communication with traffic signals and roadside units</p>
+
+    <div class="card">
+      <h3>🚑 Emergency Features</h3>
+      <ul style="color: var(--text-secondary); line-height: 2">
+        <li>Vehicle registration & tracking</li>
+        <li>Multiple route alternatives</li>
+        <li>Traffic-aware routing</li>
+        <li>Real-time ETA updates</li>
+        <li>Automatic signal priority</li>
+      </ul>
     </div>
-    <!-- <div class="feature">
-        <h3>V2X Communication</h3>
-        <p>Vehicle-to-Everything communication including pedestrians and IoT devices</p>
-    </div> -->
+
+    <div class="card">
+      <h3>🔍 Detection System</h3>
+      <ul style="color: var(--text-secondary); line-height: 2">
+        <li>YOLOv5-based detection</li>
+        <li>Live camera feed analysis</li>
+        <li>Video upload processing</li>
+        <li>Confidence scoring</li>
+        <li>Automatic complaint filing</li>
+      </ul>
+    </div>
+  </div>
 </div>
 {% endblock %}
