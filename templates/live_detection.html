@@ -1,219 +1,341 @@
-{% extends "base1.html" %}
-
-{% block content %}
+{% extends "base1.html" %} {% block content %}
 <div class="container">
-    <h2 class="text-center mb-4">Live Camera Detection</h2>
-    
-    <div class="row">
-        <div class="col-md-8">
-            <div class="video-container">
-                <div id="videoPlaceholder" class="video-placeholder">
-                    <i class="fas fa-camera"></i>
-                    <p>Select a detection type to start live camera feed</p>
-                </div>
-                <img id="videoFeed" src="" style="display: none; width: 100%;" alt="Live Camera Feed">
-            </div>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="control-panel">
-                <h4><i class="fas fa-sliders-h"></i> Detection Controls</h4>
-                
-                <div class="btn-group-vertical w-100 mb-3">
-                    <button class="btn btn-warning mb-2" onclick="startDetection('accident')" id="accidentBtn">
-                        <i class="fas fa-car-crash"></i> Start Accident Detection
-                    </button>
-                    <button class="btn btn-success mb-2" onclick="startDetection('pothole')" id="potholeBtn">
-                        <i class="fas fa-road"></i> Start Pothole Detection
-                    </button>
-                    <button class="btn btn-danger" onclick="stopDetection()" id="stopBtn" style="display: none;">
-                        <i class="fas fa-stop"></i> Stop Detection
-                    </button>
-                </div>
-                
-                <div class="detection-info">
-                    <h5>Status: <span id="status" class="badge bg-secondary">Inactive</span></h5>
-                    <p id="currentType" class="text-muted">No active detection</p>
-                </div>
-                
-                <div class="instructions">
-                    <h6><i class="fas fa-info-circle"></i> Instructions:</h6>
-                    <ul>
-                        <li>Select detection type to start live camera</li>
-                        <li>Ensure good lighting conditions</li>
-                        <li>Keep camera steady for better accuracy</li>
-                        <li>High-confidence detections are automatically logged</li>
-                        <li>Click stop to end the detection session</li>
-                    </ul>
-                </div>
+  <div class="text-center mb-4">
+    <span class="badge badge-info">LIVE ANALYSIS</span>
+    <h2 style="margin-top: 1rem; font-weight: 800">Live Camera Detection</h2>
+    <p style="color: var(--text-secondary)">
+      Real-time computer vision analysis for traffic hazards
+    </p>
+  </div>
 
-                <div class="alert alert-info mt-3">
-                    <i class="fas fa-lightbulb"></i>
-                    <strong>Tip:</strong> Make sure your camera is connected and accessible by the browser.
-                </div>
-            </div>
+  <div class="row">
+    <div class="col-md-8">
+      <div
+        class="card"
+        style="padding: 0; overflow: hidden; border-radius: var(--radius-lg)"
+      >
+        <div
+          class="video-container"
+          style="
+            background: #000;
+            min-height: 480px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+          "
+        >
+          <div
+            id="videoPlaceholder"
+            class="video-placeholder"
+            style="text-align: center; color: rgba(255, 255, 255, 0.5)"
+          >
+            <i
+              class="fas fa-camera"
+              style="font-size: 4rem; margin-bottom: 1rem"
+            ></i>
+            <p>Select a detection type to start live camera feed</p>
+          </div>
+          <img
+            id="videoFeed"
+            src=""
+            style="
+              display: none;
+              width: 100%;
+              height: 100%;
+              object-fit: contain;
+            "
+            alt="Live Camera Feed"
+          />
+
+          <!-- Overlay for active status -->
+          <div
+            id="activeOverlay"
+            style="
+              display: none;
+              position: absolute;
+              top: 20px;
+              left: 20px;
+              background: rgba(0, 0, 0, 0.6);
+              padding: 5px 15px;
+              border-radius: 20px;
+              color: white;
+              backdrop-filter: blur(5px);
+            "
+          >
+            <span
+              style="
+                width: 10px;
+                height: 10px;
+                background: #ef4444;
+                border-radius: 50%;
+                display: inline-block;
+                margin-right: 8px;
+                animation: pulse 1.5s infinite;
+              "
+            ></span>
+            LIVE
+          </div>
         </div>
+      </div>
     </div>
+
+    <div class="col-md-4">
+      <div class="card h-100">
+        <h4
+          style="
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+          "
+        >
+          <i class="fas fa-sliders-h"></i> Detection Controls
+        </h4>
+
+        <div class="d-grid gap-2 mb-4">
+          <button
+            class="btn btn-warning"
+            onclick="startDetection('accident')"
+            id="accidentBtn"
+            style="
+              text-align: left;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+            "
+          >
+            <i class="fas fa-car-crash"></i> Start Accident Detection
+          </button>
+          <button
+            class="btn btn-success"
+            onclick="startDetection('pothole')"
+            id="potholeBtn"
+            style="
+              text-align: left;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+            "
+          >
+            <i class="fas fa-road"></i> Start Pothole Detection
+          </button>
+          <button
+            class="btn btn-danger"
+            onclick="stopDetection()"
+            id="stopBtn"
+            style="
+              display: none;
+              text-align: left;
+              align-items: center;
+              gap: 10px;
+            "
+          >
+            <i class="fas fa-stop"></i> Stop Detection
+          </button>
+        </div>
+
+        <div
+          class="detection-info"
+          style="
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            margin-bottom: 1.5rem;
+          "
+        >
+          <h5
+            style="
+              font-size: 0.9rem;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              color: var(--text-secondary);
+              margin-bottom: 0.5rem;
+            "
+          >
+            Status
+          </h5>
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <span
+              id="status"
+              class="badge badge-secondary"
+              style="background: var(--text-secondary); color: white"
+              >Inactive</span
+            >
+            <span
+              id="currentType"
+              style="font-size: 0.9rem; color: var(--text-secondary)"
+              >No active detection</span
+            >
+          </div>
+        </div>
+
+        <div class="instructions">
+          <h6 style="font-weight: 600; margin-bottom: 1rem">
+            <i class="fas fa-info-circle"></i> Instructions:
+          </h6>
+          <ul
+            style="
+              padding-left: 1.2rem;
+              color: var(--text-secondary);
+              font-size: 0.9rem;
+              line-height: 1.6;
+            "
+          >
+            <li>Select detection type to start live camera</li>
+            <li>Ensure good lighting conditions</li>
+            <li>Keep camera steady for better accuracy</li>
+            <li>High-confidence detections are automatically logged</li>
+            <li>Click stop to end the detection session</li>
+          </ul>
+        </div>
+
+        <div class="alert alert-info mt-3" style="font-size: 0.85rem">
+          <i class="fas fa-lightbulb"></i>
+          <strong>Tip:</strong> Make sure your camera is connected and
+          accessible by the browser.
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<script>
-    let isDetectionActive = false;
-    let currentDetectionType = '';
-
-    function startDetection(type) {
-        if (isDetectionActive) {
-            showNotification('Please stop current detection first.', 'warning');
-            return;
-        }
-
-        currentDetectionType = type;
-        isDetectionActive = true;
-
-        // Update UI
-        document.getElementById('status').textContent = 'Active';
-        document.getElementById('status').className = 'badge bg-success';
-        document.getElementById('currentType').textContent = type.charAt(0).toUpperCase() + type.slice(1) + ' Detection';
-        document.getElementById('currentType').className = 'text-success fw-bold';
-        
-        // Show video feed
-        document.getElementById('videoPlaceholder').style.display = 'none';
-        document.getElementById('videoFeed').style.display = 'block';
-        document.getElementById('videoFeed').src = "{{ url_for('video_feed', detection_type='') }}" + type;
-        
-        // Update buttons
-        document.getElementById('accidentBtn').style.display = 'none';
-        document.getElementById('potholeBtn').style.display = 'none';
-        document.getElementById('stopBtn').style.display = 'block';
-
-        // Notify server
-        fetch(`/start_live_detection/${type}`)
-            .then(response => response.json())
-            .then(data => {
-                console.log('Detection started:', data);
-                showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} detection started successfully!`, 'success');
-            })
-            .catch(error => {
-                console.error('Error starting detection:', error);
-                showNotification('Error starting detection. Please check console.', 'danger');
-            });
-    }
-
-    function stopDetection() {
-        if (!isDetectionActive) return;
-
-        isDetectionActive = false;
-
-        // Update UI
-        document.getElementById('status').textContent = 'Inactive';
-        document.getElementById('status').className = 'badge bg-secondary';
-        document.getElementById('currentType').textContent = 'No active detection';
-        document.getElementById('currentType').className = 'text-muted';
-        
-        // Hide video feed
-        document.getElementById('videoFeed').style.display = 'none';
-        document.getElementById('videoFeed').src = '';
-        document.getElementById('videoPlaceholder').style.display = 'flex';
-
-        // Update buttons
-        document.getElementById('accidentBtn').style.display = 'block';
-        document.getElementById('potholeBtn').style.display = 'block';
-        document.getElementById('stopBtn').style.display = 'none';
-
-        // Notify server
-        fetch('/stop_live_detection')
-            .then(response => response.json())
-            .then(data => {
-                console.log('Detection stopped:', data);
-                showNotification('Detection stopped successfully!', 'info');
-            })
-            .catch(error => {
-                console.error('Error stopping detection:', error);
-                showNotification('Error stopping detection.', 'warning');
-            });
-    }
-
-    // Clean up when leaving page
-    window.addEventListener('beforeunload', function() {
-        if (isDetectionActive) {
-            fetch('/stop_live_detection')
-                .catch(error => console.error('Error stopping detection on page leave:', error));
-        }
-    });
-
-    // Handle page visibility change
-    document.addEventListener('visibilitychange', function() {
-        if (document.hidden && isDetectionActive) {
-            stopDetection();
-        }
-    });
-</script>
-
 <style>
-.video-container {
-    background: #000;
-    border-radius: 10px;
-    overflow: hidden;
-    position: relative;
-    min-height: 400px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 1rem;
-}
-
-.video-placeholder {
-    color: #666;
-    text-align: center;
-    padding: 2rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-}
-
-.video-placeholder i {
-    font-size: 4rem;
-    margin-bottom: 1rem;
-    opacity: 0.5;
-}
-
-.control-panel {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 10px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-    height: fit-content;
-}
-
-.detection-info {
-    background: var(--light-blue);
-    padding: 1rem;
-    border-radius: 8px;
-    margin: 1rem 0;
-}
-
-.instructions {
-    font-size: 0.9rem;
-    color: #666;
-}
-
-.instructions ul {
-    padding-left: 1rem;
-    margin-bottom: 0;
-}
-
-.instructions li {
-    margin-bottom: 0.5rem;
-}
-
-.btn-group-vertical .btn {
-    margin-bottom: 0.5rem;
-}
-
-.btn-group-vertical .btn:last-child {
-    margin-bottom: 0;
-}
+  @keyframes pulse {
+    0% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scale(1.2);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
 </style>
+
+<script>
+  let isDetectionActive = false;
+  let currentDetectionType = "";
+
+  function startDetection(type) {
+    if (isDetectionActive) {
+      showNotification("Please stop current detection first.", "warning");
+      return;
+    }
+
+    currentDetectionType = type;
+    isDetectionActive = true;
+
+    // Update UI
+    document.getElementById("status").textContent = "Active";
+    document.getElementById("status").className = "badge badge-success";
+    document.getElementById("status").style.background = ""; // Reset inline style
+    document.getElementById("status").style.color = "";
+
+    document.getElementById("currentType").textContent =
+      type.charAt(0).toUpperCase() + type.slice(1) + " Detection";
+    document.getElementById("currentType").style.color =
+      "var(--accent-success)";
+    document.getElementById("currentType").style.fontWeight = "bold";
+
+    // Show video feed
+    document.getElementById("videoPlaceholder").style.display = "none";
+    document.getElementById("videoFeed").style.display = "block";
+    document.getElementById("activeOverlay").style.display = "block";
+    document.getElementById("videoFeed").src =
+      "{{ url_for('video_feed', detection_type='') }}" + type;
+
+    // Update buttons
+    document.getElementById("accidentBtn").style.display = "none";
+    document.getElementById("potholeBtn").style.display = "none";
+    document.getElementById("stopBtn").style.display = "flex";
+
+    // Notify server
+    fetch(`/start_live_detection/${type}`)
+      .then((response) => response.json())
+      .then((data) => {
+        console.log("Detection started:", data);
+        showNotification(
+          `${
+            type.charAt(0).toUpperCase() + type.slice(1)
+          } detection started successfully!`,
+          "success"
+        );
+      })
+      .catch((error) => {
+        console.error("Error starting detection:", error);
+        showNotification(
+          "Error starting detection. Please check console.",
+          "error"
+        );
+      });
+  }
+
+  function stopDetection() {
+    if (!isDetectionActive) return;
+
+    isDetectionActive = false;
+
+    // Update UI
+    document.getElementById("status").textContent = "Inactive";
+    document.getElementById("status").className = "badge badge-secondary";
+    document.getElementById("status").style.background =
+      "var(--text-secondary)";
+    document.getElementById("status").style.color = "white";
+
+    document.getElementById("currentType").textContent = "No active detection";
+    document.getElementById("currentType").style.color =
+      "var(--text-secondary)";
+    document.getElementById("currentType").style.fontWeight = "normal";
+
+    // Hide video feed
+    document.getElementById("videoFeed").style.display = "none";
+    document.getElementById("videoFeed").src = "";
+    document.getElementById("activeOverlay").style.display = "none";
+    document.getElementById("videoPlaceholder").style.display = "block";
+
+    // Update buttons
+    document.getElementById("accidentBtn").style.display = "flex";
+    document.getElementById("potholeBtn").style.display = "flex";
+    document.getElementById("stopBtn").style.display = "none";
+
+    // Notify server
+    fetch("/stop_live_detection")
+      .then((response) => response.json())
+      .then((data) => {
+        console.log("Detection stopped:", data);
+        showNotification("Detection stopped successfully!", "info");
+      })
+      .catch((error) => {
+        console.error("Error stopping detection:", error);
+        showNotification("Error stopping detection.", "warning");
+      });
+  }
+
+  // Clean up when leaving page
+  window.addEventListener("beforeunload", function () {
+    if (isDetectionActive) {
+      fetch("/stop_live_detection").catch((error) =>
+        console.error("Error stopping detection on page leave:", error)
+      );
+    }
+  });
+
+  // Handle page visibility change
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden && isDetectionActive) {
+      stopDetection();
+    }
+  });
+</script>
 {% endblock %}

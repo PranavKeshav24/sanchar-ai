@@ -6,7 +6,9 @@ import random
 from datetime import datetime
 from data_loader import load_vehicle_data, get_random_vehicles
 from simulation import SimulationEngine, TrafficPredictor
-from maps_service import GoogleMapsService, EmergencyVehicleTracker
+from google_maps_service import GoogleMapsService, GoogleEarthEngineService, EmergencyVehicleTracker
+from traffic_ml import AdvancedTrafficPredictor, V2ICommunicationSystem
+from nlp_classifier import ComplaintClassifier
 import threading
 import time
 import numpy as np
@@ -30,9 +32,22 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 db = SQLAlchemy(app)
 
-# Initialize Google Maps Service
+# Initialize Google Maps & Earth Engine Services
 maps_service = GoogleMapsService(app.config.get('GOOGLE_MAPS_API_KEY'))
+earth_engine_service = GoogleEarthEngineService(
+    project_id=app.config.get('GOOGLE_EARTH_ENGINE_PROJECT'),
+    key_path=app.config.get('GOOGLE_EARTH_ENGINE_KEY_PATH')
+)
 emergency_tracker = EmergencyVehicleTracker(maps_service)
+
+# Initialize ML Traffic Prediction & V2I Communication
+traffic_predictor_ml = AdvancedTrafficPredictor()
+v2i_system = V2ICommunicationSystem()
+
+# Initialize NLP Complaint Classifier
+nlp_classifier = ComplaintClassifier(
+    api_key=app.config.get('OPENROUTER_API_KEY')
+)
 
 # User model
 class User(db.Model):
@@ -101,6 +116,32 @@ def init_db():
                   latitude REAL,
                   longitude REAL,
                   address TEXT)''')
+    
+    # Create terrain_analysis table
+    c.execute('''CREATE TABLE IF NOT EXISTS terrain_analysis
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  location_id INTEGER,
+                  terrain_type TEXT,
+                  elevation REAL,
+                  slope REAL,
+                  surface_roughness REAL,
+                  water_drainage_score REAL,
+                  pothole_risk_score REAL,
+                  last_inspection TEXT,
+                  FOREIGN KEY (location_id) REFERENCES complaints(id))''')
+    
+    # Create road_quality table
+    c.execute('''CREATE TABLE IF NOT EXISTS road_quality
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  road_name TEXT,
+                  city TEXT,
+                  latitude REAL,
+                  longitude REAL,
+                  quality_score REAL,
+                  last_maintenance TEXT,
+                  traffic_volume TEXT,
+                  weather_exposure TEXT)''')
+    
     conn.commit()
     conn.close()
 
@@ -973,6 +1014,270 @@ def get_all_complaints_with_location():
         })
     
     return jsonify({'complaints': complaints_list})
+
+@app.route('/api/terrain/heatmap')
+def get_terrain_heatmap():
+    """Get terrain-based risk heatmap data"""
+    conn = sqlite3.connect('complaints.db')
+    c = conn.cursor()
+    
+    # Check if terrain_analysis table exists
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='terrain_analysis'")
+    if not c.fetchone():
+        conn.close()
+        return jsonify({'heatmap_data': []})
+    
+    c.execute('''SELECT c.latitude, c.longitude, t.pothole_risk_score, t.terrain_type, c.detection_type
+                FROM complaints c
+                JOIN terrain_analysis t ON c.id = t.location_id
+                WHERE c.latitude IS NOT NULL AND c.longitude IS NOT NULL''')
+    
+    results = c.fetchall()
+    conn.close()
+    
+    heatmap_data = []
+    for r in results:
+        heatmap_data.append({
+            'lat': r[0],
+            'lng': r[1],
+            'risk': r[2],
+            'terrain': r[3],
+            'detection_type': r[4]
+        })
+    
+    return jsonify({'heatmap_data': heatmap_data})
+
+@app.route('/api/terrain/statistics')
+def get_terrain_statistics():
+    """Get terrain analysis statistics"""
+    conn = sqlite3.connect('complaints.db')
+    c = conn.cursor()
+    
+    # Check if terrain_analysis table exists
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='terrain_analysis'")
+    if not c.fetchone():
+        conn.close()
+        return jsonify({'statistics': {}})
+    
+    stats = {}
+    
+    # High-risk areas
+    c.execute('SELECT COUNT(*) FROM terrain_analysis WHERE pothole_risk_score > 70')
+    stats['high_risk_areas'] = c.fetchone()[0]
+    
+    # Average risk score
+    c.execute('SELECT AVG(pothole_risk_score) FROM terrain_analysis')
+    avg_risk = c.fetchone()[0]
+    stats['avg_risk_score'] = round(avg_risk, 2) if avg_risk else 0
+    
+    # Terrain distribution
+    c.execute('SELECT terrain_type, COUNT(*) FROM terrain_analysis GROUP BY terrain_type')
+    stats['terrain_distribution'] = dict(c.fetchall())
+    
+    # Risk levels breakdown
+    c.execute('SELECT COUNT(*) FROM terrain_analysis WHERE pothole_risk_score < 30')
+    stats['low_risk'] = c.fetchone()[0]
+    c.execute('SELECT COUNT(*) FROM terrain_analysis WHERE pothole_risk_score BETWEEN 30 AND 70')
+    stats['medium_risk'] = c.fetchone()[0]
+    c.execute('SELECT COUNT(*) FROM terrain_analysis WHERE pothole_risk_score > 70')
+    stats['high_risk'] = c.fetchone()[0]
+    
+    conn.close()
+    return jsonify({'statistics': stats})
+
+# ============ NEW GOOGLE EARTH ENGINE TERRAIN ANALYSIS ROUTES ============
+
+@app.route('/api/terrain/analyze', methods=['POST'])
+def analyze_terrain():
+    """Analyze terrain using Google Earth Engine for a specific location"""
+    data = request.get_json()
+    lat = data.get('lat')
+    lng = data.get('lng')
+    
+    if lat is None or lng is None:
+        return jsonify({'error': 'Latitude and longitude are required'}), 400
+    
+    try:
+        terrain_analysis = earth_engine_service.get_terrain_analysis(lat, lng)
+        return jsonify(terrain_analysis)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/terrain/elevation', methods=['POST'])
+def get_elevation():
+    """Get elevation for a location"""
+    data = request.get_json()
+    lat = data.get('lat')
+    lng = data.get('lng')
+    
+    if lat is None or lng is None:
+        return jsonify({'error': 'Latitude and longitude are required'}), 400
+    
+    try:
+        elevation_data = maps_service.get_elevation(lat, lng)
+        return jsonify(elevation_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============ TRAFFIC PREDICTION & V2I ROUTES ============
+
+@app.route('/api/traffic/predict', methods=['POST'])
+def predict_traffic():
+    """Predict traffic density using ML model"""
+    data = request.get_json()
+    lat = data.get('lat')
+    lng = data.get('lng')
+    time_of_day = data.get('time_of_day', datetime.now().hour)
+    day_of_week = data.get('day_of_week', datetime.now().weekday())
+    
+    if lat is None or lng is None:
+        return jsonify({'error': 'Latitude and longitude are required'}), 400
+    
+    try:
+        # Get current weather if available
+        weather_conditions = data.get('weather_conditions', {
+            'temperature': 25,
+            'humidity': 50,
+            'visibility': 10
+        })
+        
+        predictions = traffic_predictor_ml.predict_traffic_density(
+            lat=lat,
+            lng=lng,
+            time_of_day=time_of_day,
+            day_of_week=day_of_week,
+            weather_conditions=weather_conditions
+        )
+        
+        return jsonify(predictions)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/v2i/register', methods=['POST'])
+def register_v2i_vehicle():
+    """Register vehicle with V2I communication system"""
+    data = request.get_json()
+    vehicle_id = data.get('vehicle_id')
+    vehicle_type = data.get('vehicle_type', 'car')
+    location = data.get('location')
+    
+    if not vehicle_id or not location:
+        return jsonify({'error': 'Vehicle ID and location are required'}), 400
+    
+    try:
+        vehicle_info = v2i_system.register_vehicle(vehicle_id, vehicle_type, location)
+        return jsonify(vehicle_info)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/v2i/priority', methods=['POST'])
+def request_signal_priority():
+    """Request signal priority for emergency vehicle"""
+    data = request.get_json()
+    vehicle_id = data.get('vehicle_id')
+    destination = data.get('destination')
+    
+    if not vehicle_id or not destination:
+        return jsonify({'error': 'Vehicle ID and destination are required'}), 400
+    
+    try:
+        result = v2i_system.request_priority_signal(vehicle_id, destination)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/v2i/optimize', methods=['POST'])
+def optimize_traffic_flow():
+    """Optimize traffic flow for a road segment"""
+    data = request.get_json()
+    road_segment_id = data.get('road_segment_id')
+    
+    if not road_segment_id:
+        return jsonify({'error': 'Road segment ID is required'}), 400
+    
+    try:
+        optimization = v2i_system.optimize_traffic_flow(road_segment_id)
+        return jsonify(optimization)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/v2i/broadcast_alert', methods=['POST'])
+def broadcast_v2i_alert():
+    """Broadcast alert to vehicles in area"""
+    data = request.get_json()
+    alert_type = data.get('alert_type')
+    message = data.get('message')
+    lat = data.get('lat')
+    lng = data.get('lng')
+    radius = data.get('radius', 1000)
+    
+    if not all([alert_type, message, lat, lng]):
+        return jsonify({'error': 'All fields are required'}), 400
+    
+    try:
+        result = v2i_system.broadcast_alert(alert_type, message, (lat, lng), radius)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============ NLP COMPLAINT CLASSIFICATION ROUTES ============
+
+@app.route('/api/nlp/classify_complaint', methods=['POST'])
+def classify_complaint():
+    """Classify complaint using NLP (OpenRouter/Claude)"""
+    data = request.get_json()
+    complaint_text = data.get('complaint_text')
+    
+    if not complaint_text:
+        return jsonify({'error': 'Complaint text is required'}), 400
+    
+    try:
+        classification = nlp_classifier.classify_complaint(complaint_text)
+        return jsonify(classification)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/nlp/batch_classify', methods=['POST'])
+def batch_classify_complaints():
+    """Classify multiple complaints in batch"""
+    data = request.get_json()
+    complaints = data.get('complaints', [])
+    
+    if not complaints:
+        return jsonify({'error': 'Complaints list is required'}), 400
+    
+    try:
+        results = nlp_classifier.batch_classify(complaints)
+        return jsonify({'results': results})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/demo/generate', methods=['POST'])
+def generate_demo_data():
+    """Generate demo data for presentations"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    try:
+        from demo_data_generator import DemoDataGenerator
+        generator = DemoDataGenerator()
+        
+        # Clear existing demo data
+        generator.clear_demo_data()
+        
+        # Generate new data
+        detections = generator.generate_demo_detections(count=75)
+        generator.generate_road_quality_data()
+        
+        stats = generator.get_demo_statistics()
+        
+        return jsonify({
+            'status': 'success',
+            'detections_generated': len(detections),
+            'statistics': stats
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/logout')
 def logout():

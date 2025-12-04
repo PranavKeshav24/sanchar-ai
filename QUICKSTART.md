@@ -7,7 +7,8 @@ Get up and running in 5 minutes! ⚡
 ✅ Python 3.8 or higher
 ✅ Web browser (Chrome recommended)
 ✅ Internet connection
-✅ Google account (for Maps API)
+
+**No API keys required!** 🎉 We use 100% free and open-source map services.
 
 ## Step 1: Get the Code (1 min)
 
@@ -29,42 +30,9 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## Step 3: Get Google Maps API Key (1 min)
+## Step 3: Run the Application (30 sec)
 
-**Quick Method:**
-
-1. Visit: https://console.cloud.google.com/
-2. Create new project: "Sanchar-AI"
-3. Go to: APIs & Services → Library
-4. Enable these (click each):
-   - Maps JavaScript API
-   - Geocoding API
-   - Directions API
-   - Places API
-5. Go to: APIs & Services → Credentials
-6. Create Credentials → API Key
-7. **Copy your API key**
-
-## Step 4: Configure API Key (30 sec)
-
-**Option A - Environment Variable (Recommended):**
-
-```bash
-# Linux/Mac
-export GOOGLE_MAPS_API_KEY='your-api-key-here'
-
-# Windows PowerShell
-$env:GOOGLE_MAPS_API_KEY='your-api-key-here'
-```
-
-**Option B - Direct Config:**
-Edit `config.py`, line 9:
-
-```python
-GOOGLE_MAPS_API_KEY = 'your-api-key-here'  # Replace this
-```
-
-## Step 5: Run! (30 sec)
+No configuration needed! Just run:
 
 ```bash
 python app.py
@@ -76,7 +44,7 @@ You should see:
 * Running on http://127.0.0.1:5000
 ```
 
-## Step 6: Access the App
+## Step 4: Access the App
 
 Open browser and go to: **http://localhost:5000**
 
@@ -106,11 +74,20 @@ Open browser and go to: **http://localhost:5000**
 ### 1. Map Dashboard (30 sec)
 
 - Click "Map View"
+- **Toggle between 2D and 3D views** using the buttons
 - Click "My Location" (allow browser permission)
 - Try searching for your city
 - Click "Show All Detections"
 
-### 2. Emergency Tracking (1 min)
+### 2. 3D Globe Experience 🌍
+
+- Click the "🌍 3D Globe" toggle on any map
+- **Drag to rotate** the Earth
+- **Scroll to zoom** in/out
+- Click "3D Buildings" to see building visualizations
+- Toggle between tilted 3D and top-down 2D perspectives
+
+### 3. Emergency Tracking (1 min)
 
 - Click "Emergency Tracking"
 - Fill form:
@@ -118,10 +95,10 @@ Open browser and go to: **http://localhost:5000**
   - Type: `Ambulance`
   - Click "Use My Location" for current
   - Destination: Enter an address
-- Click "Register & Start Tracking"
-- **See the route appear!**
+- Click "Start Emergency Route"
+- **See the route appear on both 2D and 3D views!**
 
-### 3. AI Detection (Optional - requires webcam)
+### 4. AI Detection (Optional - requires webcam)
 
 - Click "AI Detection"
 - Click "Live Detection"
@@ -129,22 +106,41 @@ Open browser and go to: **http://localhost:5000**
 - Select "Pothole" or "Accident"
 - Click "Start Detection"
 
-### 4. Theme Switcher
+### 5. Theme Switcher
 
 - Look for button in top-right corner
 - Click to toggle Dark/Light mode
-- **Instant theme change!**
+- **Maps automatically adapt to theme!**
+
+---
+
+## Map Technology Stack
+
+Sanchar AI uses **100% free and open-source** map technologies:
+
+| Feature      | Technology                  | Why It's Great               |
+| ------------ | --------------------------- | ---------------------------- |
+| 2D Maps      | **Leaflet + OpenStreetMap** | Fast, reliable, no API key   |
+| 3D Globe     | **CesiumJS**                | Google Earth-like experience |
+| 3D Buildings | **Cesium OSM Buildings**    | Free 3D building data        |
+| Routing      | **OSRM**                    | Open-source directions       |
+| Geocoding    | **Nominatim**               | Free address search          |
 
 ---
 
 ## Common Quick Fixes
 
-### "Map shows 'For development purposes only'"
+### "Map not loading"
 
-**Solution**: Enable billing in Google Cloud (don't worry, $200 free/month)
+**Solution**: Check your internet connection. Maps load from CDN.
 
-1. Go to: https://console.cloud.google.com/billing
-2. Link a billing account (no charges for dev usage)
+### "3D Globe shows blank"
+
+**Solution**:
+
+1. Check browser supports WebGL
+2. Try refreshing the page
+3. Use 2D map as fallback
 
 ### "ImportError: No module named..."
 
@@ -170,14 +166,6 @@ pip install -r requirements.txt --force-reinstall
 app.run(debug=True, port=5001)  # Use different port
 ```
 
-### "API key error"
-
-**Solution**:
-
-1. Check key is correct (no extra spaces)
-2. Enable billing in Google Cloud
-3. Wait 5 minutes after creating key
-
 ---
 
 ## Testing Your Setup
@@ -187,7 +175,8 @@ app.run(debug=True, port=5001)  # Use different port
 ✅ Homepage loads
 ✅ Can register/login
 ✅ Dashboard shows
-✅ Map displays
+✅ 2D Map displays
+✅ 3D Globe works (toggle button)
 ✅ Can toggle theme
 ✅ Emergency form works
 
@@ -200,6 +189,7 @@ If all checked, **you're good to go!**
 1. **Explore Features**
 
    - Try all menu items
+   - Toggle between 2D and 3D maps
    - Add some test detections
    - Register emergency vehicles
 
@@ -233,13 +223,13 @@ Edit `static/css/modern-theme.css`:
 
 ```css
 :root {
-  --accent-primary: #4f46e5; /* Your color */
+  --accent-primary: #4f46e5; /* Your brand color */
 }
 ```
 
-### Tip 3: API Usage
+### Tip 3: 3D Buildings
 
-Monitor at: https://console.cloud.google.com/apis/dashboard
+3D buildings are available in most major cities. Toggle them using the "3D Buildings" button in 3D mode.
 
 ### Tip 4: Development
 
@@ -257,12 +247,6 @@ app.run(debug=True)
 - `F12` - Open browser console (for debugging)
 - `Ctrl + Shift + I` - Inspect element
 - `Ctrl + 0` - Reset zoom
-
----
-
-## Video Walkthrough
-
-_[Future: Add link to video tutorial]_
 
 ---
 
@@ -287,10 +271,12 @@ _[Future: Add link to video tutorial]_
 After quick start, you should have:
 
 ✅ **Web interface** running
-✅ **Google Maps** displaying
+✅ **2D Map (Leaflet)** displaying with OpenStreetMap
+✅ **3D Globe (CesiumJS)** with Earth-like visualization
 ✅ **User authentication** working
-✅ **Theme switcher** functional
-✅ **Basic features** accessible
+✅ **Theme switcher** functional (maps adapt!)
+✅ **Emergency routing** via OSRM
+✅ **All features** accessible without API keys
 
 ---
 
@@ -308,7 +294,6 @@ After quick start, you should have:
 - ⚠️ Proper server (not flask dev server)
 - ⚠️ HTTPS
 - ⚠️ Production database
-- ⚠️ API key restrictions
 - ⚠️ Security hardening
 
 See `README.md` section on "Production Deployment"
@@ -330,30 +315,30 @@ pip list
 # Check if server is running
 curl http://localhost:5000
 
-# View running processes
-ps aux | grep python
+# View running processes (Windows PowerShell)
+Get-Process python
 
-# Kill process (if needed)
-kill <PID>
+# Kill process if needed (Windows)
+Stop-Process -Name python
 ```
 
 ---
 
 ## Success! 🎉
 
-If you see the dashboard with a working map, **congratulations!** You've successfully set up Sanchar AI.
+If you see the dashboard with a working 2D map and can toggle to 3D Globe, **congratulations!** You've successfully set up Sanchar AI.
 
 ### What You Can Do Now:
 
 1. Explore all features
-2. Add test data
-3. Customize for your needs
-4. Deploy to production
+2. Toggle between 2D and 3D views
+3. Add test data
+4. Customize for your needs
 5. Contribute improvements
 
 ---
 
-**Total Time**: ~5-10 minutes
+**Total Time**: ~3-5 minutes (No API setup needed!)
 **Difficulty**: Easy
 **Prerequisites**: Basic command line knowledge
 

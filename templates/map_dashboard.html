@@ -1,91 +1,229 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Map Dashboard - Sanchar AI</title>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='css/modern-theme.css') }}"
-    />
-    <script src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&libraries=places,geometry"></script>
-  </head>
-  <body>
-    <nav class="navbar">
-      <div class="nav-container">
-        <div class="nav-logo">
-          <h2>🚗 Sanchar AI</h2>
+{% extends "base1.html" %} {% block head %}
+<!-- CesiumJS for 3D Globe - Load FIRST -->
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Cesium.js"></script>
+<link
+  href="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Widgets/widgets.css"
+  rel="stylesheet"
+/>
+{% endblock %} {% block content %}
+<div class="container-fluid px-4 py-4">
+  <div class="hero-section text-center mb-4">
+    <h1 class="display-5 fw-bold gradient-text">Interactive Detection Map</h1>
+    <p class="lead text-secondary">
+      Real-time visualization powered by Google Maps Platform with AI-Enhanced
+      Features
+    </p>
+  </div>
+
+  <div class="row g-4">
+    <!-- Left Panel: Controls & Stats -->
+    <div class="col-lg-3">
+      <!-- Stats Card -->
+      <div class="glass-card mb-4">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-chart-pie me-2"></i>Overview</h5>
         </div>
-        <div class="nav-menu">
-          <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
-          <a href="{{ url_for('map_dashboard') }}" class="nav-link">Map View</a>
-          <a href="{{ url_for('emergency_tracking') }}" class="nav-link"
-            >Emergency Tracking</a
-          >
-          <a href="{{ url_for('complaints') }}" class="nav-link">Complaints</a>
-          <a href="{{ url_for('simulation') }}" class="nav-link">Simulation</a>
-          <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
+        <div class="row g-3 text-center">
+          <div class="col-6">
+            <div class="p-3 rounded bg-white bg-opacity-10">
+              <h3 class="fw-bold text-warning mb-0" id="pothole-count">0</h3>
+              <small class="text-muted text-uppercase">Potholes</small>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-3 rounded bg-white bg-opacity-10">
+              <h3 class="fw-bold text-danger mb-0" id="accident-count">0</h3>
+              <small class="text-muted text-uppercase">Accidents</small>
+            </div>
+          </div>
         </div>
       </div>
-    </nav>
 
-    <div class="dashboard">
-      <h1>Real-Time Traffic & Detection Map</h1>
-
-      <div class="dashboard-cards">
-        <div class="card">
-          <h3>📍 Detection Overview</h3>
-          <div class="stats-grid">
-            <div class="stat-item">
-              <h4>Potholes</h4>
-              <p id="pothole-count">0</p>
-            </div>
-            <div class="stat-item">
-              <h4>Accidents</h4>
-              <p id="accident-count">0</p>
-            </div>
-          </div>
+      <!-- Quick Actions -->
+      <div class="glass-card mb-4">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-bolt me-2"></i>Quick Actions</h5>
         </div>
-
-        <div class="card">
-          <h3>🚨 Quick Actions</h3>
-          <div class="flex" style="flex-direction: column; gap: 1rem">
-            <button class="btn btn-primary" onclick="showCurrentLocation()">
-              📍 My Location
-            </button>
-            <button class="btn btn-info" onclick="showAllDetections()">
-              🗺️ Show All Detections
-            </button>
-            <button class="btn btn-success" onclick="findNearbyHospitals()">
-              🏥 Nearby Hospitals
-            </button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3>🔍 Search Location</h3>
-          <div class="form-group">
-            <input
-              type="text"
-              id="addressSearch"
-              class="form-control"
-              placeholder="Enter address or location..."
-            />
-          </div>
-          <button class="btn btn-primary" onclick="searchAddress()">
-            Search
+        <div class="d-grid gap-2">
+          <button
+            class="btn btn-outline-primary custom-btn"
+            onclick="showCurrentLocation()"
+          >
+            <i class="fas fa-crosshairs me-2"></i>My Location
+          </button>
+          <button
+            class="btn btn-outline-info custom-btn"
+            onclick="showAllDetections()"
+          >
+            <i class="fas fa-layer-group me-2"></i>Show All
+          </button>
+          <button
+            class="btn btn-outline-success custom-btn"
+            onclick="findNearbyHospitals()"
+          >
+            <i class="fas fa-hospital me-2"></i>Nearby Hospitals
+          </button>
+          <button
+            class="btn btn-warning custom-btn text-white"
+            onclick="generateDemoData()"
+          >
+            <i class="fas fa-magic me-2"></i>Generate Demo Data
           </button>
         </div>
       </div>
 
-      <div class="map-container">
-        <div id="map"></div>
+      <!-- Search -->
+      <div class="glass-card">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-search me-2"></i>Search</h5>
+        </div>
+        <div class="input-group mb-3">
+          <input
+            type="text"
+            id="addressSearch"
+            class="form-control"
+            placeholder="Enter location..."
+          />
+          <button class="btn btn-primary" onclick="searchAddress()">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
       </div>
+    </div>
 
-      <div class="card mt-4">
-        <h3>📊 Detection Details</h3>
+    <!-- Center Panel: Map -->
+    <div class="col-lg-9">
+      <div
+        class="glass-card p-0 h-100 position-relative overflow-hidden"
+        style="min-height: 600px"
+      >
+        <!-- Map Controls Overlay -->
+        <div class="map-controls-overlay d-flex flex-column gap-2">
+          <!-- View Types -->
+          <div
+            class="btn-group shadow-sm bg-white bg-opacity-10 backdrop-blur rounded-pill p-1"
+          >
+            <button
+              class="btn btn-sm btn-light rounded-pill active"
+              id="btn-roadmap"
+              onclick="switchMapType('roadmap')"
+            >
+              Road
+            </button>
+            <button
+              class="btn btn-sm btn-light rounded-pill"
+              id="btn-satellite"
+              onclick="switchMapType('satellite')"
+            >
+              Sat
+            </button>
+            <button
+              class="btn btn-sm btn-light rounded-pill"
+              id="btn-terrain"
+              onclick="switchMapType('terrain')"
+            >
+              Terrain
+            </button>
+            <button
+              class="btn btn-sm btn-light rounded-pill"
+              id="btn-hybrid"
+              onclick="switchMapType('hybrid')"
+            >
+              Hybrid
+            </button>
+          </div>
+
+          <!-- Layer Controls -->
+          <div class="d-flex gap-2">
+            <button
+              class="btn btn-sm btn-light shadow-sm rounded-pill"
+              id="btn-traffic"
+              onclick="toggleTrafficLayer()"
+            >
+              <i class="fas fa-traffic-light me-1"></i>Traffic
+            </button>
+            <button
+              class="btn btn-sm btn-light shadow-sm rounded-pill"
+              id="btn-3d"
+              onclick="toggle3D()"
+            >
+              <i class="fas fa-cube me-1"></i>3D
+            </button>
+            <button
+              class="btn btn-sm btn-light shadow-sm rounded-pill"
+              id="btn-globe"
+              onclick="toggleGlobeView()"
+            >
+              <i class="fas fa-globe-asia me-1"></i>Globe
+            </button>
+            <button
+              class="btn btn-sm btn-light shadow-sm rounded-pill"
+              id="heatmap-toggle"
+              onclick="toggleTerrainHeatmap()"
+            >
+              <i class="fas fa-fire me-1"></i>Risk Map
+            </button>
+            <button
+              class="btn btn-sm btn-light shadow-sm rounded-pill"
+              id="gee-analyze"
+              onclick="analyzeTerrainGEE()"
+            >
+              <i class="fas fa-mountain me-1"></i>GEE Analysis
+            </button>
+            <div
+              class="btn-group shadow-sm bg-white bg-opacity-10 backdrop-blur rounded-pill ms-2"
+              id="rotate-controls"
+              style="display: none"
+            >
+              <button
+                class="btn btn-sm btn-light rounded-pill"
+                onclick="rotateMap(-45)"
+              >
+                <i class="fas fa-undo"></i>
+              </button>
+              <button
+                class="btn btn-sm btn-light rounded-pill"
+                onclick="rotateMap(45)"
+              >
+                <i class="fas fa-redo"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Report Button Overlay -->
+        <div class="report-btn-overlay">
+          <button
+            class="btn btn-danger shadow-lg rounded-pill px-4 py-2"
+            id="btn-report-mode"
+            onclick="toggleReportMode()"
+          >
+            <i class="fas fa-exclamation-triangle me-2"></i>Report Issue
+          </button>
+        </div>
+
+        <!-- Map Container -->
+        <div id="map" class="h-100 w-100">
+          <div
+            class="d-flex flex-column align-items-center justify-content-center h-100 text-muted"
+          >
+            <div class="spinner-border mb-3" role="status"></div>
+            <p>Loading Google Maps...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Detections Table -->
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="glass-card">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-list me-2"></i>Recent Detections</h5>
+        </div>
         <div class="table-responsive">
-          <table>
+          <table class="table table-hover custom-table align-middle">
             <thead>
               <tr>
                 <th>Type</th>
@@ -97,278 +235,902 @@
             </thead>
             <tbody id="detections-table">
               <tr>
-                <td colspan="5" class="text-center">Loading detections...</td>
+                <td colspan="5" class="text-center py-4">
+                  Loading detections...
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
+  </div>
+</div>
 
-    <footer class="footer">
-      <p>&copy; 2024 Sanchar AI - Smart Traffic Management System</p>
-    </footer>
+<!-- Report Modal -->
+<div class="modal fade" id="reportModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content glass-card border-0">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">
+          <i class="fas fa-exclamation-circle text-danger me-2"></i>Report
+          Pothole
+        </h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <form id="report-form">
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-bold">LOCATION</label>
+            <input
+              type="text"
+              id="report-location"
+              class="form-control"
+              readonly
+            />
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-bold"
+              >DESCRIPTION</label
+            >
+            <textarea
+              id="report-description"
+              class="form-control"
+              rows="3"
+              placeholder="Describe the condition..."
+            ></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-bold">SEVERITY</label>
+            <select id="report-severity" class="form-select custom-select">
+              <option value="low">Low - Minor damage</option>
+              <option value="medium" selected>
+                Medium - Noticeable damage
+              </option>
+              <option value="high">High - Severe damage</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0">
+        <button
+          type="button"
+          class="btn btn-outline-light"
+          data-bs-dismiss="modal"
+        >
+          Cancel
+        </button>
+        <button type="button" class="btn btn-danger" onclick="submitReport()">
+          Submit Report
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
-    <script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
-    <script>
-      let map;
-      let markers = [];
-      const DEFAULT_LAT = parseFloat("{{ default_lat }}");
-      const DEFAULT_LNG = parseFloat("{{ default_lng }}");
+<style>
+  .map-controls-overlay {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 10;
+  }
 
-      // Initialize map
-      function initializeMap() {
-        map = MapUtils.initMap("map", DEFAULT_LAT, DEFAULT_LNG, 13);
-        loadAllDetections();
+  .report-btn-overlay {
+    position: absolute;
+    bottom: 2rem;
+    right: 1rem;
+    z-index: 10;
+  }
+
+  .backdrop-blur {
+    backdrop-filter: blur(10px);
+  }
+</style>
+
+<script>
+  const DEFAULT_LAT = parseFloat("{{ default_lat }}");
+  const DEFAULT_LNG = parseFloat("{{ default_lng }}");
+  let googleMap;
+  let markers = [];
+  let heatmapLayer = null;
+  let trafficLayer = null;
+  let is3D = false;
+  let reportMode = false;
+  let reportMarker = null;
+  let reportLat = null;
+  let reportLng = null;
+  let reportModal = null;
+  let isGlobeMode = false;
+  // cesiumViewer is declared in theme-manager.js globally
+
+  function initializeMap() {
+    try {
+      const mapContainer = document.getElementById("map");
+      // Don't clear if we are just re-initializing Google Maps
+      if (!isGlobeMode) {
+        mapContainer.innerHTML = "";
+
+        googleMap = new google.maps.Map(document.getElementById("map"), {
+          center: { lat: DEFAULT_LAT, lng: DEFAULT_LNG },
+          zoom: 13,
+          mapId: "DEMO_MAP_ID", // Enable Vector Map features
+          mapTypeId: "roadmap",
+          heading: 0,
+          tilt: 0,
+          styles: getMapStyles(),
+          mapTypeControl: false,
+          fullscreenControl: true,
+          streetViewControl: true,
+          zoomControl: true,
+        });
+
+        trafficLayer = new google.maps.TrafficLayer();
+        googleMap.addListener("click", handleMapClick);
+
+        // Re-add markers if they exist
+        if (markers.length > 0) {
+          loadAllDetections();
+        }
       }
 
-      // Load all detections from database
-      async function loadAllDetections() {
-        try {
-          const response = await fetch("/api/complaints/all_with_location");
-          const data = await response.json();
+      reportModal = new bootstrap.Modal(document.getElementById("reportModal"));
 
-          let potholeCount = 0;
-          let accidentCount = 0;
+      if (!isGlobeMode) {
+        loadAllDetections();
+        loadTerrainRiskData();
+      }
+    } catch (error) {
+      console.error("Error initializing map:", error);
+      showNotification("Failed to load map: " + error.message, "danger");
+    }
+  }
 
-          MapUtils.clearMarkers();
-          const tableBody = document.getElementById("detections-table");
-          tableBody.innerHTML = "";
+  function getMapStyles() {
+    // Dark mode styles for Google Maps
+    return [
+      { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+      { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+      { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+      {
+        featureType: "administrative.locality",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#d59563" }],
+      },
+      {
+        featureType: "poi",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#d59563" }],
+      },
+      {
+        featureType: "poi.park",
+        elementType: "geometry",
+        stylers: [{ color: "#263c3f" }],
+      },
+      {
+        featureType: "poi.park",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#6b9a76" }],
+      },
+      {
+        featureType: "road",
+        elementType: "geometry",
+        stylers: [{ color: "#38414e" }],
+      },
+      {
+        featureType: "road",
+        elementType: "geometry.stroke",
+        stylers: [{ color: "#212a37" }],
+      },
+      {
+        featureType: "road",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#9ca5b3" }],
+      },
+      {
+        featureType: "road.highway",
+        elementType: "geometry",
+        stylers: [{ color: "#746855" }],
+      },
+      {
+        featureType: "road.highway",
+        elementType: "geometry.stroke",
+        stylers: [{ color: "#1f2835" }],
+      },
+      {
+        featureType: "road.highway",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#f3d19c" }],
+      },
+      {
+        featureType: "transit",
+        elementType: "geometry",
+        stylers: [{ color: "#2f3948" }],
+      },
+      {
+        featureType: "transit.station",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#d59563" }],
+      },
+      {
+        featureType: "water",
+        elementType: "geometry",
+        stylers: [{ color: "#17263c" }],
+      },
+      {
+        featureType: "water",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#515c6d" }],
+      },
+      {
+        featureType: "water",
+        elementType: "labels.text.stroke",
+        stylers: [{ color: "#17263c" }],
+      },
+    ];
+  }
 
-          data.complaints.forEach((complaint) => {
-            if (complaint.latitude && complaint.longitude) {
-              // Add marker to map
-              const icon = {
-                url:
-                  complaint.detection_type === "pothole"
-                    ? "https://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
-                    : "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-                scaledSize: new google.maps.Size(40, 40),
-              };
+  function switchMapType(type) {
+    if (!googleMap) return;
+    googleMap.setMapTypeId(type);
 
-              const infoContent = `
-                          <div style="padding: 10px; max-width: 250px;">
-                              <h4 style="margin: 0 0 10px 0; color: #333;">
-                                  ${complaint.detection_type.toUpperCase()}
-                              </h4>
-                              <p style="margin: 5px 0;"><strong>Confidence:</strong> ${(
-                                complaint.confidence * 100
-                              ).toFixed(1)}%</p>
-                              <p style="margin: 5px 0;"><strong>Time:</strong> ${
-                                complaint.timestamp
-                              }</p>
-                              <p style="margin: 5px 0;"><strong>Description:</strong> ${
-                                complaint.description || "Auto-detected"
-                              }</p>
-                              ${
-                                complaint.image_path
-                                  ? `<img src="/${complaint.image_path}" style="width: 100%; margin-top: 10px; border-radius: 5px;">`
-                                  : ""
-                              }
-                          </div>
-                      `;
+    document
+      .querySelectorAll(".btn-group .btn")
+      .forEach((btn) => btn.classList.remove("active"));
+    document.getElementById(`btn-${type}`).classList.add("active");
+  }
 
-              MapUtils.addMarker(
+  function toggleTrafficLayer() {
+    if (!trafficLayer) return;
+    const btn = document.getElementById("btn-traffic");
+
+    if (trafficLayer.getMap()) {
+      trafficLayer.setMap(null);
+      btn.classList.remove("btn-success", "text-white");
+      btn.classList.add("btn-light");
+    } else {
+      trafficLayer.setMap(googleMap);
+      btn.classList.remove("btn-light");
+      btn.classList.add("btn-success", "text-white");
+    }
+  }
+
+  function toggle3D() {
+    if (isGlobeMode) {
+      // In Globe mode, toggle between 2D and 3D view
+      if (window.MapUtils && window.MapUtils.toggleViewMode) {
+        window.MapUtils.toggleViewMode();
+        is3D = !is3D;
+        update3DButtonState();
+      }
+      return;
+    }
+
+    if (!googleMap) return;
+    is3D = !is3D;
+    update3DButtonState();
+
+    const rotateControls = document.getElementById("rotate-controls");
+    if (is3D) {
+      googleMap.setTilt(45);
+      googleMap.setHeading(0);
+      rotateControls.style.display = "inline-flex";
+    } else {
+      googleMap.setTilt(0);
+      googleMap.setHeading(0);
+      rotateControls.style.display = "none";
+    }
+  }
+
+  function update3DButtonState() {
+    const btn = document.getElementById("btn-3d");
+    if (is3D) {
+      btn.classList.remove("btn-light");
+      btn.classList.add("btn-success", "text-white");
+    } else {
+      btn.classList.remove("btn-success", "text-white");
+      btn.classList.add("btn-light");
+    }
+  }
+
+  function rotateMap(degrees) {
+    if (!googleMap || isGlobeMode) return;
+    const currentHeading = googleMap.getHeading() || 0;
+    googleMap.setHeading(currentHeading + degrees);
+  }
+
+  function toggleGlobeView() {
+    isGlobeMode = !isGlobeMode;
+    const btn = document.getElementById("btn-globe");
+    const mapContainer = document.getElementById("map");
+
+    // Disable Google Maps specific controls
+    const googleControls = [
+      "btn-traffic",
+      "heatmap-toggle",
+      "btn-roadmap",
+      "btn-satellite",
+      "btn-terrain",
+      "btn-hybrid",
+    ];
+    googleControls.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = isGlobeMode;
+    });
+
+    if (isGlobeMode) {
+      btn.classList.remove("btn-light");
+      btn.classList.add("btn-primary", "text-white");
+
+      // Initialize Cesium
+      console.log("Initializing Cesium Globe...");
+      console.log("MapUtils:", window.MapUtils);
+
+      if (window.MapUtils && window.MapUtils.initCesiumMap) {
+        window.MapUtils.initCesiumMap(
+          "map",
+          DEFAULT_LAT,
+          DEFAULT_LNG,
+          12,
+          "{{ api_key }}"
+        )
+          .then((viewer) => {
+            // Verify we actually got a Cesium viewer
+            if (window.currentMapType !== "cesium") {
+              throw new Error(
+                "Failed to initialize 3D Globe (fallback active)"
+              );
+            }
+
+            window.cesiumViewer = viewer;
+
+            // Add 3D buildings (will skip if Google 3D Tiles are active)
+            window.MapUtils.add3DBuildings();
+
+            // Re-add markers to Cesium
+            loadAllDetections();
+          })
+          .catch((err) => {
+            console.error("Failed to init Cesium:", err);
+            const errorMsg = err && err.message ? err.message : String(err);
+            showNotification(`Failed to load 3D Globe: ${errorMsg}`, "danger");
+
+            // Reset state
+            isGlobeMode = false;
+            btn.classList.remove("btn-primary", "text-white");
+            btn.classList.add("btn-light");
+            googleControls.forEach((id) => {
+              const el = document.getElementById(id);
+              if (el) el.disabled = false;
+            });
+
+            // Reinitialize Google Maps
+            initializeMap();
+          });
+      } else {
+        console.error("MapUtils or initCesiumMap not found");
+        showNotification(
+          "3D Globe module not loaded. Please refresh the page.",
+          "danger"
+        );
+        isGlobeMode = false;
+
+        // Restore button state
+        btn.classList.remove("btn-primary", "text-white");
+        btn.classList.add("btn-light");
+
+        // Re-enable controls
+        googleControls.forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = false;
+        });
+      }
+    } else {
+      btn.classList.remove("btn-primary", "text-white");
+      btn.classList.add("btn-light");
+
+      // Destroy Cesium and re-init Google Maps
+      if (window.cesiumViewer) {
+        window.cesiumViewer.destroy();
+        window.cesiumViewer = null;
+      }
+      initializeMap();
+    }
+  }
+
+  function toggleReportMode() {
+    reportMode = !reportMode;
+    const btn = document.getElementById("btn-report-mode");
+
+    if (reportMode) {
+      btn.innerHTML = '<i class="fas fa-times me-2"></i>Cancel Reporting';
+      btn.classList.remove("btn-danger");
+      btn.classList.add("btn-secondary");
+      googleMap.setOptions({ draggableCursor: "crosshair" });
+      showNotification("Click on map to mark pothole location", "info");
+    } else {
+      btn.innerHTML =
+        '<i class="fas fa-exclamation-triangle me-2"></i>Report Issue';
+      btn.classList.remove("btn-secondary");
+      btn.classList.add("btn-danger");
+      googleMap.setOptions({ draggableCursor: null });
+      if (reportMarker) {
+        reportMarker.setMap(null);
+        reportMarker = null;
+      }
+    }
+  }
+
+  function handleMapClick(e) {
+    if (!reportMode) return;
+
+    reportLat = e.latLng.lat();
+    reportLng = e.latLng.lng();
+
+    if (reportMarker) reportMarker.setMap(null);
+
+    reportMarker = new google.maps.Marker({
+      position: e.latLng,
+      map: googleMap,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 10,
+        fillColor: "#ef4444",
+        fillOpacity: 1,
+        strokeColor: "white",
+        strokeWeight: 3,
+      },
+      animation: google.maps.Animation.DROP,
+    });
+
+    // Reverse geocode
+    fetch("/api/reverse_geocode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lat: reportLat, lng: reportLng }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        document.getElementById("report-location").value =
+          data.address || `${reportLat.toFixed(6)}, ${reportLng.toFixed(6)}`;
+      })
+      .catch(() => {
+        document.getElementById("report-location").value = `${reportLat.toFixed(
+          6
+        )}, ${reportLng.toFixed(6)}`;
+      });
+
+    reportModal.show();
+  }
+
+  async function submitReport() {
+    const description = document.getElementById("report-description").value;
+    const severity = document.getElementById("report-severity").value;
+
+    if (!description.trim()) {
+      showNotification("Please provide a description", "warning");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/complaints/add_with_location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          detection_type: "pothole",
+          description: `User reported: ${description} (Severity: ${severity})`,
+          latitude: reportLat,
+          longitude: reportLng,
+          confidence: 1.0,
+          image_path: null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        showNotification("Report submitted successfully", "success");
+        reportModal.hide();
+        toggleReportMode();
+        loadAllDetections();
+      } else {
+        showNotification("Failed to submit report", "danger");
+      }
+    } catch (error) {
+      console.error("Error submitting report:", error);
+      showNotification("Error submitting report", "danger");
+    }
+  }
+
+  async function loadAllDetections() {
+    try {
+      const response = await fetch("/api/complaints/all_with_location");
+      const data = await response.json();
+
+      let potholeCount = 0;
+      let accidentCount = 0;
+
+      if (!isGlobeMode) {
+        markers.forEach((m) => m.setMap(null));
+        markers = [];
+      } else if (window.MapUtils) {
+        window.MapUtils.clearMarkers();
+      }
+
+      const tableBody = document.getElementById("detections-table");
+      tableBody.innerHTML = "";
+
+      if (data.complaints && data.complaints.length > 0) {
+        data.complaints.forEach((complaint) => {
+          if (complaint.latitude && complaint.longitude) {
+            const isPothole = complaint.detection_type === "pothole";
+
+            if (isPothole) potholeCount++;
+            else accidentCount++;
+
+            // Add to Map
+            if (isGlobeMode && window.MapUtils) {
+              window.MapUtils.addMarker(
                 complaint.latitude,
                 complaint.longitude,
-                complaint.detection_type,
-                icon,
-                infoContent
+                complaint.detection_type.toUpperCase(),
+                null,
+                `Confidence: ${(complaint.confidence * 100).toFixed(1)}%`
               );
+            } else if (googleMap) {
+              const color = isPothole ? "#f59e0b" : "#ef4444";
+              const marker = new google.maps.Marker({
+                position: { lat: complaint.latitude, lng: complaint.longitude },
+                map: googleMap,
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 8,
+                  fillColor: color,
+                  fillOpacity: 0.9,
+                  strokeColor: "white",
+                  strokeWeight: 2,
+                },
+                title: complaint.detection_type.toUpperCase(),
+              });
 
-              // Count detections
-              if (complaint.detection_type === "pothole") {
-                potholeCount++;
-              } else if (complaint.detection_type === "accident") {
-                accidentCount++;
-              }
+              const infoWindow = new google.maps.InfoWindow({
+                content: `
+                                    <div style="padding:8px;">
+                                        <h6 class="mb-1 fw-bold">${complaint.detection_type.toUpperCase()}</h6>
+                                        <small class="text-muted">Confidence: ${(
+                                          complaint.confidence * 100
+                                        ).toFixed(1)}%</small><br>
+                                        <small class="text-muted">${
+                                          complaint.timestamp
+                                        }</small>
+                                    </div>
+                                `,
+              });
 
-              // Add to table
-              const row = document.createElement("tr");
-              row.innerHTML = `
-                          <td>
-                              <span class="badge badge-${
-                                complaint.detection_type === "pothole"
-                                  ? "warning"
-                                  : "danger"
-                              }">
-                                  ${complaint.detection_type}
-                              </span>
-                          </td>
-                          <td>${
-                            complaint.address ||
-                            `${complaint.latitude.toFixed(
-                              4
-                            )}, ${complaint.longitude.toFixed(4)}`
-                          }</td>
-                          <td>${complaint.timestamp}</td>
-                          <td>${(complaint.confidence * 100).toFixed(1)}%</td>
-                          <td>
-                              <button class="btn btn-info" style="padding: 0.5rem 1rem; font-size: 0.875rem;"
-                                      onclick="focusOnLocation(${
-                                        complaint.latitude
-                                      }, ${complaint.longitude})">
-                                  View on Map
-                              </button>
-                          </td>
-                      `;
-              tableBody.appendChild(row);
+              marker.addListener("click", () =>
+                infoWindow.open(googleMap, marker)
+              );
+              markers.push(marker);
             }
-          });
 
-          // Update counts
-          document.getElementById("pothole-count").textContent = potholeCount;
-          document.getElementById("accident-count").textContent = accidentCount;
-
-          if (data.complaints.length === 0) {
-            tableBody.innerHTML =
-              '<tr><td colspan="5" class="text-center">No detections found</td></tr>';
+            // Add to table
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                            <td><span class="badge bg-${
+                              isPothole ? "warning" : "danger"
+                            } rounded-pill">${
+              complaint.detection_type
+            }</span></td>
+                            <td class="small text-truncate" style="max-width: 150px;">${
+                              complaint.address ||
+                              `${complaint.latitude.toFixed(
+                                4
+                              )}, ${complaint.longitude.toFixed(4)}`
+                            }</td>
+                            <td class="small text-muted">${
+                              complaint.timestamp
+                            }</td>
+                            <td><div class="progress" style="height: 6px;"><div class="progress-bar bg-${
+                              isPothole ? "warning" : "danger"
+                            }" style="width: ${
+              complaint.confidence * 100
+            }%"></div></div></td>
+                            <td><button class="btn btn-sm btn-outline-light" onclick="focusOnLocation(${
+                              complaint.latitude
+                            }, ${
+              complaint.longitude
+            })"><i class="fas fa-eye"></i></button></td>
+                        `;
+            tableBody.appendChild(row);
           }
-        } catch (error) {
-          console.error("Error loading detections:", error);
-          MapUtils.showNotification("Failed to load detections", "error");
-        }
+        });
+      } else {
+        tableBody.innerHTML =
+          '<tr><td colspan="5" class="text-center py-4 text-muted">No detections found</td></tr>';
       }
 
-      // Show current location
-      async function showCurrentLocation() {
-        try {
-          const location = await MapUtils.getCurrentLocation();
-          map.setCenter(location);
-          map.setZoom(15);
+      document.getElementById("pothole-count").textContent = potholeCount;
+      document.getElementById("accident-count").textContent = accidentCount;
+    } catch (error) {
+      console.error("Error loading detections:", error);
+    }
+  }
 
-          MapUtils.addMarker(
-            location.lat,
-            location.lng,
-            "Your Location",
-            {
-              url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-              scaledSize: new google.maps.Size(40, 40),
-            },
-            '<div style="padding: 10px;"><h4 style="margin: 0;">You are here</h4></div>'
+  function focusOnLocation(lat, lng) {
+    if (isGlobeMode && window.MapUtils) {
+      window.MapUtils.flyToLocation(lat, lng, 17);
+    } else if (googleMap) {
+      googleMap.panTo({ lat, lng });
+      googleMap.setZoom(17);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function showCurrentLocation() {
+    if (!navigator.geolocation) {
+      showNotification("Geolocation not supported", "warning");
+      return;
+    }
+
+    showNotification("Getting location...", "info");
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        focusOnLocation(lat, lng);
+
+        new google.maps.Marker({
+          position: { lat, lng },
+          map: googleMap,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: "#4f46e5",
+            fillOpacity: 1,
+            strokeColor: "white",
+            strokeWeight: 3,
+          },
+          animation: google.maps.Animation.DROP,
+        });
+
+        showNotification("Location found", "success");
+      },
+      () => {
+        showNotification("Location access denied", "danger");
+      }
+    );
+  }
+
+  async function searchAddress() {
+    const address = document.getElementById("addressSearch").value;
+    if (!address) return;
+
+    try {
+      const response = await fetch("/api/geocode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+      const data = await response.json();
+
+      if (data.lat && data.lng) {
+        focusOnLocation(data.lat, data.lng);
+        new google.maps.Marker({
+          position: { lat: data.lat, lng: data.lng },
+          map: googleMap,
+          animation: google.maps.Animation.DROP,
+        });
+      } else {
+        showNotification("Location not found", "warning");
+      }
+    } catch (e) {
+      showNotification("Search failed", "danger");
+    }
+  }
+
+  async function findNearbyHospitals() {
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const response = await fetch("/api/nearby_hospitals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            radius: 5000,
+          }),
+        });
+        const data = await response.json();
+
+        if (data.hospitals?.length > 0) {
+          data.hospitals.forEach((h) => {
+            new google.maps.Marker({
+              position: { lat: h.lat, lng: h.lng },
+              map: googleMap,
+              title: h.name,
+              icon: {
+                url: "http://maps.google.com/mapfiles/ms/icons/hospitals.png",
+              },
+            });
+          });
+          showNotification(
+            `Found ${data.hospitals.length} hospitals`,
+            "success"
           );
-
-          MapUtils.showNotification("Location found!", "success");
-        } catch (error) {
-          console.error("Error getting location:", error);
-          MapUtils.showNotification("Could not get your location", "error");
+        } else {
+          showNotification("No hospitals found nearby", "info");
         }
+      } catch (e) {
+        showNotification("Failed to find hospitals", "danger");
       }
+    });
+  }
 
-      // Search address
-      async function searchAddress() {
-        const address = document.getElementById("addressSearch").value;
-        if (!address) {
-          MapUtils.showNotification("Please enter an address", "warning");
+  function toggleTerrainHeatmap() {
+    if (!googleMap) return;
+    const btn = document.getElementById("heatmap-toggle");
+
+    if (heatmapLayer) {
+      heatmapLayer.setMap(null);
+      heatmapLayer = null;
+      btn.classList.remove("btn-danger", "text-white");
+      btn.classList.add("btn-light");
+      return;
+    }
+
+    fetch("/api/terrain/heatmap")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.heatmap_data?.length) {
+          showNotification("No risk data available", "warning");
           return;
         }
 
-        try {
-          const response = await fetch("/api/geocode", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: address }),
-          });
+        const heatmapData = data.heatmap_data.map((p) => ({
+          location: new google.maps.LatLng(p.lat, p.lng),
+          weight: p.risk,
+        }));
 
-          const data = await response.json();
+        heatmapLayer = new google.maps.visualization.HeatmapLayer({
+          data: heatmapData,
+          map: googleMap,
+          radius: 30,
+        });
 
-          if (data.lat && data.lng) {
-            map.setCenter({ lat: data.lat, lng: data.lng });
-            map.setZoom(15);
+        btn.classList.remove("btn-light");
+        btn.classList.add("btn-danger", "text-white");
+        showNotification("Risk map loaded", "success");
+      });
+  }
 
-            MapUtils.addMarker(
-              data.lat,
-              data.lng,
-              data.formatted_address,
-              null,
-              `<div style="padding: 10px;"><h4 style="margin: 0;">${data.formatted_address}</h4></div>`
-            );
+  async function generateDemoData() {
+    if (!confirm("Generate demo data?")) return;
 
-            MapUtils.showNotification("Location found!", "success");
-          } else {
-            MapUtils.showNotification("Location not found", "error");
-          }
-        } catch (error) {
-          console.error("Error searching address:", error);
-          MapUtils.showNotification("Search failed", "error");
-        }
-      }
-
-      // Find nearby hospitals
-      async function findNearbyHospitals() {
-        try {
-          const location = await MapUtils.getCurrentLocation();
-
-          const response = await fetch("/api/nearby_hospitals", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              lat: location.lat,
-              lng: location.lng,
-              radius: 5000,
-            }),
-          });
-
-          const data = await response.json();
-
-          if (data.hospitals && data.hospitals.length > 0) {
-            data.hospitals.forEach((hospital) => {
-              MapUtils.addMarker(
-                hospital.lat,
-                hospital.lng,
-                hospital.name,
-                {
-                  url: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
-                  scaledSize: new google.maps.Size(40, 40),
-                },
-                `
-                              <div style="padding: 10px; max-width: 200px;">
-                                  <h4 style="margin: 0 0 5px 0;">${
-                                    hospital.name
-                                  }</h4>
-                                  <p style="margin: 0;">${hospital.address}</p>
-                                  ${
-                                    hospital.rating
-                                      ? `<p style="margin: 5px 0;">⭐ ${hospital.rating}</p>`
-                                      : ""
-                                  }
-                              </div>
-                          `
-              );
-            });
-
-            MapUtils.showNotification(
-              `Found ${data.hospitals.length} hospitals nearby`,
-              "success"
-            );
-          } else {
-            MapUtils.showNotification("No hospitals found nearby", "info");
-          }
-        } catch (error) {
-          console.error("Error finding hospitals:", error);
-          MapUtils.showNotification("Failed to find hospitals", "error");
-        }
-      }
-
-      // Show all detections
-      function showAllDetections() {
+    try {
+      const res = await fetch("/api/demo/generate", { method: "POST" });
+      const data = await res.json();
+      if (data.status === "success") {
+        showNotification(
+          `Generated ${data.detections_generated} detections`,
+          "success"
+        );
         loadAllDetections();
-        map.setCenter({ lat: DEFAULT_LAT, lng: DEFAULT_LNG });
-        map.setZoom(13);
-        MapUtils.showNotification("Showing all detections", "info");
+      }
+    } catch (e) {
+      showNotification("Failed to generate data", "danger");
+    }
+  }
+
+  async function analyzeTerrainGEE() {
+    if (!googleMap && !window.cesiumViewer) return;
+
+    const btn = document.getElementById("gee-analyze");
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Analyzing...';
+
+    try {
+      // Get center coordinates
+      let lat, lng;
+      if (isGlobeMode && window.cesiumViewer) {
+        const center = window.cesiumViewer.camera.positionCartographic;
+        lat = Cesium.Math.toDegrees(center.latitude);
+        lng = Cesium.Math.toDegrees(center.longitude);
+      } else if (googleMap) {
+        const center = googleMap.getCenter();
+        lat = center.lat();
+        lng = center.lng();
       }
 
-      // Focus on specific location
-      function focusOnLocation(lat, lng) {
-        map.setCenter({ lat: lat, lng: lng });
-        map.setZoom(17);
+      const response = await fetch("/api/terrain/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat, lng }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) throw new Error(data.error);
+
+      // Show results
+      const content = `
+            <div class="text-start">
+                <h6 class="fw-bold mb-2">Terrain Analysis (GEE)</h6>
+                <div class="small">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Elevation:</span>
+                        <span class="fw-bold">${data.elevation}m</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Slope:</span>
+                        <span class="fw-bold">${data.slope}°</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Terrain:</span>
+                        <span class="fw-bold text-primary">${data.terrain_type
+                          .replace("_", " ")
+                          .toUpperCase()}</span>
+                    </div>
+                    <div class="d-flex justify-content-between border-top pt-1 mt-1">
+                        <span>Risk Score:</span>
+                        <span class="fw-bold ${
+                          data.pothole_risk_score > 50
+                            ? "text-danger"
+                            : "text-success"
+                        }">${data.pothole_risk_score}/100</span>
+                    </div>
+                    <div class="mt-2 text-muted" style="font-size: 0.7rem">
+                        Source: ${
+                          data.analysis_method === "google_earth_engine"
+                            ? "Google Earth Engine"
+                            : "Estimated (Fallback)"
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+
+      // Create a popup/info window
+      if (isGlobeMode && window.MapUtils) {
+        window.MapUtils.addMarker(lat, lng, "Terrain Analysis", null, content);
+        window.MapUtils.flyToLocation(lat, lng, 16);
+      } else if (googleMap) {
+        const infoWindow = new google.maps.InfoWindow({
+          content: content,
+          position: { lat, lng },
+        });
+        infoWindow.open(googleMap);
       }
 
-      // Initialize when page loads
-      window.addEventListener("load", initializeMap);
+      showNotification("Terrain analysis complete", "success");
+    } catch (e) {
+      console.error(e);
+      showNotification("Analysis failed: " + e.message, "danger");
+    } finally {
+      btn.innerHTML = originalHtml;
+    }
+  }
 
-      // Refresh detections every 30 seconds
-      setInterval(loadAllDetections, 30000);
-    </script>
-  </body>
-</html>
+  async function loadTerrainRiskData() {
+    // Preload risk data if needed
+  }
+
+  window.initializeMap = initializeMap;
+
+  // Debug: Log when scripts are ready
+  console.log("Map Dashboard Initialized");
+  console.log("Cesium available:", typeof Cesium !== "undefined");
+  console.log("MapUtils available:", typeof window.MapUtils !== "undefined");
+</script>
+
+<script
+  src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&libraries=places,geometry,visualization&callback=initializeMap&loading=async"
+  async
+  defer
+></script>
+{% endblock %}

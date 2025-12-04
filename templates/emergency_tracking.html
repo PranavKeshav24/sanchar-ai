@@ -1,461 +1,867 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Emergency Vehicle Tracking - Sanchar AI</title>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='css/modern-theme.css') }}"
-    />
-    <script src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&libraries=places,geometry"></script>
-  </head>
-  <body>
-    <nav class="navbar">
-      <div class="nav-container">
-        <div class="nav-logo">
-          <h2>🚗 Sanchar AI</h2>
+{% extends "base1.html" %} {% block content %}
+<div class="container-fluid px-4 py-4">
+  <div class="hero-section text-center mb-4">
+    <h1 class="display-5 fw-bold gradient-text">Emergency Response</h1>
+    <p class="lead text-secondary">
+      Real-time tracking and optimized routing for emergency vehicles
+    </p>
+  </div>
+
+  <div class="row g-4">
+    <!-- Left Panel: Controls & List -->
+    <div class="col-lg-3">
+      <!-- Register Vehicle Card -->
+      <div class="glass-card mb-4">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-plus-circle me-2"></i>New Mission</h5>
         </div>
-        <div class="nav-menu">
-          <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
-          <a href="{{ url_for('map_dashboard') }}" class="nav-link">Map View</a>
-          <a href="{{ url_for('emergency_tracking') }}" class="nav-link"
-            >Emergency Tracking</a
-          >
-          <a href="{{ url_for('complaints') }}" class="nav-link">Complaints</a>
-          <a href="{{ url_for('simulation') }}" class="nav-link">Simulation</a>
-          <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
-        </div>
-      </div>
-    </nav>
+        <form id="emergency-form">
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-muted"
+              >VEHICLE ID</label
+            >
+            <input
+              type="text"
+              id="vehicleId"
+              class="form-control"
+              placeholder="e.g., AMB-001"
+              required
+            />
+          </div>
 
-    <div class="dashboard">
-      <h1>🚨 Emergency Vehicle Tracking</h1>
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-muted">TYPE</label>
+            <select id="vehicleType" class="form-select custom-select" required>
+              <option value="ambulance">🚑 Ambulance</option>
+              <option value="fire_truck">🚒 Fire Truck</option>
+              <option value="police">🚓 Police</option>
+            </select>
+          </div>
 
-      <div class="dashboard-cards">
-        <div class="card">
-          <h3>Register Emergency Vehicle</h3>
-          <form id="emergency-form">
-            <div class="form-group">
-              <label>Vehicle ID</label>
-              <input
-                type="text"
-                id="vehicleId"
-                class="form-control"
-                placeholder="e.g., AMB-001"
-                required
-              />
-            </div>
-
-            <div class="form-group">
-              <label>Vehicle Type</label>
-              <select id="vehicleType" class="form-control" required>
-                <option value="ambulance">🚑 Ambulance</option>
-                <option value="fire_truck">🚒 Fire Truck</option>
-                <option value="police">🚓 Police</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label>Current Location</label>
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-muted"
+              >CURRENT LOCATION</label
+            >
+            <div class="input-group">
               <input
                 type="text"
                 id="currentLocation"
                 class="form-control"
-                placeholder="Enter address or coordinates"
+                placeholder="Address/Coords"
                 required
               />
               <button
                 type="button"
-                class="btn btn-info"
-                style="margin-top: 0.5rem"
+                class="btn btn-outline-primary"
                 onclick="useMyLocation()"
               >
-                📍 Use My Location
+                <i class="fas fa-crosshairs"></i>
               </button>
             </div>
-
-            <div class="form-group">
-              <label>Destination</label>
-              <input
-                type="text"
-                id="destination"
-                class="form-control"
-                placeholder="Enter destination address"
-                required
-              />
-            </div>
-
-            <button type="submit" class="btn btn-success">
-              🚨 Register & Start Tracking
-            </button>
-          </form>
-        </div>
-
-        <div class="card">
-          <h3>Active Emergency Vehicles</h3>
-          <div id="active-vehicles" style="max-height: 400px; overflow-y: auto">
-            <p class="text-center" style="color: var(--text-secondary)">
-              No active emergency vehicles
-            </p>
           </div>
+
+          <div class="mb-4">
+            <label class="form-label small fw-bold text-muted"
+              >DESTINATION</label
+            >
+            <input
+              type="text"
+              id="destination"
+              class="form-control"
+              placeholder="Destination address"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            class="btn btn-danger w-100 custom-btn pulse-btn"
+          >
+            <i class="fas fa-siren-on me-2"></i>Start Mission
+          </button>
+        </form>
+      </div>
+
+      <!-- Active Vehicles List -->
+      <div class="glass-card flex-grow-1">
+        <div
+          class="card-header-custom mb-3 d-flex justify-content-between align-items-center"
+        >
+          <h5><i class="fas fa-list-ul me-2"></i>Active Units</h5>
+          <span class="badge bg-success rounded-pill" id="activeCount">0</span>
         </div>
-      </div>
-
-      <div class="map-container" style="height: 700px">
-        <div id="map"></div>
-      </div>
-
-      <div class="card mt-4">
-        <h3>📊 Emergency Vehicle Details</h3>
-        <div id="vehicle-details">
-          <p class="text-center" style="color: var(--text-secondary)">
-            Select a vehicle to view details
-          </p>
+        <div id="active-vehicles" class="vehicle-list custom-scrollbar">
+          <div class="text-center py-4 text-muted">
+            <i class="fas fa-ambulance fa-2x mb-2 opacity-50"></i>
+            <p class="small">No active missions</p>
+          </div>
         </div>
       </div>
     </div>
 
-    <footer class="footer">
-      <p>&copy; 2024 Sanchar AI - Smart Traffic Management System</p>
-    </footer>
+    <!-- Center Panel: Map -->
+    <div class="col-lg-6">
+      <div class="glass-card p-0 h-100 position-relative overflow-hidden">
+        <!-- Map Controls Overlay -->
+        <div class="map-controls-overlay d-flex flex-column gap-2">
+          <!-- View Types -->
+          <div
+            class="btn-group shadow-sm bg-white bg-opacity-10 backdrop-blur rounded-pill p-1"
+          >
+            <button
+              class="btn btn-sm btn-light rounded-pill active"
+              id="btn-roadmap"
+              onclick="switchMapType('roadmap')"
+            >
+              Road
+            </button>
+            <button
+              class="btn btn-sm btn-light rounded-pill"
+              id="btn-satellite"
+              onclick="switchMapType('satellite')"
+            >
+              Sat
+            </button>
+            <button
+              class="btn btn-sm btn-light rounded-pill"
+              id="btn-terrain"
+              onclick="switchMapType('terrain')"
+            >
+              Terrain
+            </button>
+            <button
+              class="btn btn-sm btn-light rounded-pill"
+              id="btn-hybrid"
+              onclick="switchMapType('hybrid')"
+            >
+              Hybrid
+            </button>
+          </div>
 
-    <script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
-    <script>
-      let map;
-      let vehicleMarkers = {};
-      let activeVehicles = [];
-      let currentLocationMarker = null;
+          <!-- Layer Controls -->
+          <div class="d-flex gap-2">
+            <button
+              class="btn btn-sm btn-light shadow-sm rounded-pill"
+              id="btn-traffic"
+              onclick="toggleTrafficLayer()"
+            >
+              <i class="fas fa-traffic-light me-1"></i>Traffic
+            </button>
+            <button
+              class="btn btn-sm btn-light shadow-sm rounded-pill"
+              id="btn-3d"
+              onclick="toggle3D()"
+            >
+              <i class="fas fa-cube me-1"></i>3D
+            </button>
+            <div
+              class="btn-group shadow-sm bg-white bg-opacity-10 backdrop-blur rounded-pill ms-2"
+              id="rotate-controls"
+              style="display: none"
+            >
+              <button
+                class="btn btn-sm btn-light rounded-pill"
+                onclick="rotateMap(-45)"
+              >
+                <i class="fas fa-undo"></i>
+              </button>
+              <button
+                class="btn btn-sm btn-light rounded-pill"
+                onclick="rotateMap(45)"
+              >
+                <i class="fas fa-redo"></i>
+              </button>
+            </div>
+          </div>
+        </div>
 
-      // Initialize map
-      function initializeMap() {
-        map = MapUtils.initMap("map", 12.9716, 77.5946, 12);
-        loadActiveVehicles();
+        <!-- AI Traffic Overlay -->
+        <div
+          id="ai-traffic-overlay"
+          class="position-absolute bottom-0 start-0 m-3 p-3 glass-card"
+          style="display: none; max-width: 300px; z-index: 1000"
+        >
+          <h6 class="fw-bold mb-2">
+            <i class="fas fa-brain me-2 text-primary"></i>AI Traffic Insight
+          </h6>
+          <div id="ai-traffic-content" class="small"></div>
+        </div>
+
+        <!-- Maps -->
+        <div id="map-container" class="h-100 w-100">
+          <div id="map" class="h-100 w-100"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Details -->
+    <div class="col-lg-3">
+      <div class="glass-card h-100">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-info-circle me-2"></i>Mission Details</h5>
+        </div>
+        <div id="vehicle-details" class="h-100">
+          <div class="text-center py-5 text-muted">
+            <div
+              class="icon-circle mx-auto mb-3"
+              style="width: 60px; height: 60px"
+            >
+              <i class="fas fa-mouse-pointer"></i>
+            </div>
+            <p>Select a vehicle to view live telemetry and route details</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .vehicle-list {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .vehicle-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .vehicle-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(5px);
+  }
+
+  .vehicle-card.active {
+    background: rgba(79, 70, 229, 0.1);
+    border-color: var(--accent-primary);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
+  }
+
+  .map-controls-overlay {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 1000;
+  }
+
+  .pulse-btn {
+    animation: pulse-red 2s infinite;
+  }
+
+  .icon-circle {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-item {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 0.75rem;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-value {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .backdrop-blur {
+    backdrop-filter: blur(10px);
+  }
+</style>
+
+<script>
+  let googleMap;
+  let activeVehicles = [];
+  let selectedVehicle = null;
+  let markers = {};
+  let routePolylines = {};
+  let trafficLayer = null;
+  let is3D = false;
+
+  // Initialize map
+  function initializeMap() {
+    const mapContainer = document.getElementById("map");
+    if (!mapContainer) return;
+
+    googleMap = new google.maps.Map(document.getElementById("map"), {
+      center: { lat: 12.9716, lng: 77.5946 },
+      zoom: 18,
+      mapId: "DEMO_MAP_ID", // Enable Vector Map features
+      mapTypeId: "roadmap",
+      heading: 0,
+      tilt: 0,
+      mapTypeControl: false,
+      fullscreenControl: true,
+      streetViewControl: true,
+      zoomControl: true,
+      styles: [
+        { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+        { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+        { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+        {
+          featureType: "road",
+          elementType: "geometry",
+          stylers: [{ color: "#38414e" }],
+        },
+        {
+          featureType: "road",
+          elementType: "geometry.stroke",
+          stylers: [{ color: "#212a37" }],
+        },
+        {
+          featureType: "road",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#9ca5b3" }],
+        },
+      ],
+    });
+
+    trafficLayer = new google.maps.TrafficLayer();
+    loadActiveVehicles();
+  }
+
+  function switchMapType(type) {
+    if (!googleMap) return;
+    googleMap.setMapTypeId(type);
+
+    document
+      .querySelectorAll(".btn-group .btn")
+      .forEach((btn) => btn.classList.remove("active"));
+    document.getElementById(`btn-${type}`).classList.add("active");
+  }
+
+  function toggleTrafficLayer() {
+    if (!trafficLayer) return;
+    const btn = document.getElementById("btn-traffic");
+
+    if (trafficLayer.getMap()) {
+      trafficLayer.setMap(null);
+      btn.classList.remove("btn-success", "text-white");
+      btn.classList.add("btn-light");
+    } else {
+      trafficLayer.setMap(googleMap);
+      btn.classList.remove("btn-light");
+      btn.classList.add("btn-success", "text-white");
+    }
+  }
+
+  function toggle3D() {
+    if (!googleMap) return;
+    const btn = document.getElementById("btn-3d");
+    const rotateControls = document.getElementById("rotate-controls");
+    is3D = !is3D;
+
+    if (is3D) {
+      googleMap.setTilt(45);
+      googleMap.setHeading(0);
+      btn.classList.remove("btn-light");
+      btn.classList.add("btn-success", "text-white");
+      rotateControls.style.display = "inline-flex";
+    } else {
+      googleMap.setTilt(0);
+      googleMap.setHeading(0);
+      btn.classList.remove("btn-success", "text-white");
+      btn.classList.add("btn-light");
+      rotateControls.style.display = "none";
+    }
+  }
+
+  function rotateMap(degrees) {
+    if (!googleMap) return;
+    const currentHeading = googleMap.getHeading() || 0;
+    googleMap.setHeading(currentHeading + degrees);
+  }
+
+  async function analyzeTraffic(vehicleId) {
+    const vehicle = activeVehicles.find((v) => v.id === vehicleId);
+    if (!vehicle || !vehicle.route?.route?.polyline) return;
+
+    const btn = event.currentTarget;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing...';
+
+    try {
+      // Get first point of route for prediction
+      const startPoint = vehicle.route.route.polyline[0];
+
+      const response = await fetch("/api/traffic/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: startPoint.lat,
+          lng: startPoint.lng,
+          time_of_day: new Date().getHours(),
+          day_of_week: new Date().getDay(),
+        }),
+      });
+
+      const data = await response.json();
+
+      const resultsDiv = document.getElementById(`ai-results-${vehicleId}`);
+      const congestionColor =
+        {
+          free_flow: "text-success",
+          light: "text-info",
+          moderate: "text-warning",
+          heavy: "text-orange",
+          severe: "text-danger",
+        }[data.congestion_level] || "text-muted";
+
+      resultsDiv.innerHTML = `
+              <div class="alert alert-dark bg-opacity-10 border-0 p-2">
+                  <div class="d-flex justify-content-between mb-1">
+                      <span>Density:</span>
+                      <span class="fw-bold">${data.density}%</span>
+                  </div>
+                  <div class="d-flex justify-content-between mb-1">
+                      <span>Congestion:</span>
+                      <span class="fw-bold ${congestionColor}">${data.congestion_level
+        .replace("_", " ")
+        .toUpperCase()}</span>
+                  </div>
+                  <div class="d-flex justify-content-between">
+                      <span>Rec. Speed:</span>
+                      <span class="fw-bold">${data.predicted_speed} km/h</span>
+                  </div>
+                  <div class="mt-2 pt-2 border-top border-secondary">
+                      <small class="text-muted"><i class="fas fa-robot me-1"></i>AI Confidence: ${(
+                        data.confidence * 100
+                      ).toFixed(0)}%</small>
+                  </div>
+              </div>
+          `;
+
+      // Show overlay on map
+      const overlay = document.getElementById("ai-traffic-overlay");
+      const overlayContent = document.getElementById("ai-traffic-content");
+      overlay.style.display = "block";
+      overlayContent.innerHTML = `
+              <div class="mb-2">
+                  <span class="badge bg-primary me-2">AI PREDICTION</span>
+                  <span class="text-muted">${new Date().toLocaleTimeString()}</span>
+              </div>
+              <p class="mb-0">Predicted congestion is <strong class="${congestionColor}">${data.congestion_level.replace(
+        "_",
+        " "
+      )}</strong> with ${data.density}% density.</p>
+          `;
+    } catch (e) {
+      console.error(e);
+      showNotification("AI Analysis failed", "danger");
+    } finally {
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  async function requestPriority(vehicleId) {
+    const vehicle = activeVehicles.find((v) => v.id === vehicleId);
+    if (!vehicle) return;
+
+    const btn = event.currentTarget;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Requesting...';
+
+    try {
+      // Use destination from form or vehicle data
+      const destInput = document.getElementById("destination").value;
+      // Mock destination coords if not available (in real app, geocode destInput)
+      const destination = { lat: 0, lng: 0 };
+
+      const response = await fetch("/api/v2i/priority", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vehicle_id: vehicleId,
+          destination: destination,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) throw new Error(data.error);
+
+      const resultsDiv = document.getElementById(`ai-results-${vehicleId}`);
+      resultsDiv.innerHTML += `
+              <div class="alert alert-success bg-opacity-10 border-0 p-2 mt-2">
+                  <div class="fw-bold text-success"><i class="fas fa-check-circle me-2"></i>Priority Granted</div>
+                  <div class="small mt-1">
+                      Cleared ${data.intersections_affected} intersections.
+                      <br>Est. time saved: ${data.estimated_time_saved}s
+                  </div>
+              </div>
+          `;
+      showNotification("Signal priority granted", "success");
+    } catch (e) {
+      console.error(e);
+      showNotification(e.message || "Priority request failed", "danger");
+    } finally {
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  async function loadActiveVehicles() {
+    try {
+      const response = await fetch("/api/emergency/all_active");
+      const data = await response.json();
+      activeVehicles = data.vehicles || [];
+
+      document.getElementById("activeCount").textContent =
+        activeVehicles.length;
+      updateVehiclesList();
+      updateMapMarkers();
+    } catch (error) {
+      console.error("Error loading vehicles:", error);
+    }
+  }
+
+  function updateVehiclesList() {
+    const container = document.getElementById("active-vehicles");
+    if (activeVehicles.length === 0) {
+      container.innerHTML = `
+                <div class="text-center py-4 text-muted">
+                    <i class="fas fa-ambulance fa-2x mb-2 opacity-50"></i>
+                    <p class="small">No active missions</p>
+                </div>`;
+      return;
+    }
+
+    const typeIcons = { ambulance: "🚑", fire_truck: "🚒", police: "🚓" };
+
+    container.innerHTML = activeVehicles
+      .map((vehicle) => {
+        const isSelected = selectedVehicle === vehicle.id;
+        const eta = vehicle.eta ? Math.round(vehicle.eta.eta_minutes) : "--";
+
+        return `
+            <div class="vehicle-card ${
+              isSelected ? "active" : ""
+            }" onclick="selectVehicle('${vehicle.id}')">
+                <div class="d-flex align-items-center">
+                    <div class="me-3 fs-4">${
+                      typeIcons[vehicle.type] || "🚗"
+                    }</div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h6 class="mb-0 fw-bold">${vehicle.id}</h6>
+                            <span class="badge bg-success rounded-pill" style="font-size: 0.6rem">ACTIVE</span>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>${vehicle.type
+                              .replace("_", " ")
+                              .toUpperCase()}</span>
+                            <span><i class="far fa-clock me-1"></i>${eta} min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+      })
+      .join("");
+  }
+
+  function updateMapMarkers() {
+    if (!googleMap) return;
+
+    // Track current vehicle IDs to remove old markers
+    const currentIds = new Set(activeVehicles.map((v) => v.id));
+
+    // Remove markers for vehicles that are no longer active
+    for (const [id, marker] of Object.entries(markers)) {
+      if (!currentIds.has(id)) {
+        marker.setMap(null);
+        delete markers[id];
+        if (routePolylines[id]) {
+          routePolylines[id].setMap(null);
+          delete routePolylines[id];
+        }
       }
+    }
 
-      // Use current location
-      async function useMyLocation() {
+    activeVehicles.forEach((vehicle) => {
+      if (vehicle.route?.route?.polyline?.length > 0) {
+        const pos = vehicle.route.route.polyline[0];
+        const typeColors = {
+          ambulance: "#ef4444",
+          fire_truck: "#f97316",
+          police: "#3b82f6",
+        };
+        const color = typeColors[vehicle.type] || "#10b981";
+
+        // Create or update marker
+        if (markers[vehicle.id]) {
+          markers[vehicle.id].setPosition({ lat: pos.lat, lng: pos.lng });
+        } else {
+          const marker = new google.maps.Marker({
+            position: { lat: pos.lat, lng: pos.lng },
+            map: googleMap,
+            title: `${vehicle.id} (${vehicle.type})`,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: color,
+              fillOpacity: 1,
+              strokeColor: "white",
+              strokeWeight: 2,
+            },
+          });
+
+          marker.addListener("click", () => selectVehicle(vehicle.id));
+          markers[vehicle.id] = marker;
+        }
+      }
+    });
+  }
+
+  function selectVehicle(vehicleId) {
+    selectedVehicle = vehicleId;
+    const vehicle = activeVehicles.find((v) => v.id === vehicleId);
+    if (vehicle) {
+      updateVehiclesList();
+      showVehicleDetails(vehicle);
+      displayRoute(vehicle);
+    }
+  }
+
+  function showVehicleDetails(vehicle) {
+    const container = document.getElementById("vehicle-details");
+    const eta = vehicle.eta ? Math.round(vehicle.eta.eta_minutes) : "--";
+    const dist = vehicle.eta ? vehicle.eta.distance_km.toFixed(1) : "--";
+
+    container.innerHTML = `
+            <div class="text-center mb-4">
+                <div class="display-6 mb-2">${vehicle.id}</div>
+                <span class="badge bg-primary">${vehicle.type
+                  .replace("_", " ")
+                  .toUpperCase()}</span>
+            </div>
+            
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <div class="stat-label">ETA</div>
+                    <div class="stat-value text-success">${eta} min</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Distance</div>
+                    <div class="stat-value">${dist} km</div>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="small text-muted mb-1">DESTINATION</div>
+                <div class="fw-bold text-truncate">${
+                  document.getElementById("destination").value || "Hospital"
+                }</div>
+            </div>
+
+            <div class="d-grid gap-2 mb-3">
+                <button class="btn btn-outline-primary btn-sm" onclick="focusOnVehicle('${
+                  vehicle.id
+                }')">
+                    <i class="fas fa-crosshairs me-2"></i>Track on Map
+                </button>
+                <button class="btn btn-success btn-sm" onclick="completeJourney('${
+                  vehicle.id
+                }')">
+                    <i class="fas fa-check me-2"></i>Complete Mission
+                </button>
+            </div>
+
+            <div class="border-top pt-3">
+                <h6 class="small fw-bold text-muted mb-3">AI OPERATIONS</h6>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-info btn-sm text-start" onclick="analyzeTraffic('${
+                      vehicle.id
+                    }')">
+                        <i class="fas fa-magic me-2"></i>Predict Traffic & Route
+                    </button>
+                    <button class="btn btn-outline-warning btn-sm text-start" onclick="requestPriority('${
+                      vehicle.id
+                    }')">
+                        <i class="fas fa-traffic-light me-2"></i>Request Signal Priority
+                    </button>
+                </div>
+                <div id="ai-results-${vehicle.id}" class="mt-3 small"></div>
+            </div>
+        `;
+  }
+
+  function displayRoute(vehicle) {
+    if (!googleMap || !vehicle.route?.route?.polyline) return;
+
+    // Clear existing route for this vehicle if any
+    if (routePolylines[vehicle.id]) {
+      routePolylines[vehicle.id].setMap(null);
+    }
+
+    // Clear other routes to focus on selected
+    Object.values(routePolylines).forEach((poly) => poly.setMap(null));
+    routePolylines = {};
+
+    const path = vehicle.route.route.polyline.map((p) => ({
+      lat: p.lat,
+      lng: p.lng,
+    }));
+
+    const polyline = new google.maps.Polyline({
+      path: path,
+      geodesic: true,
+      strokeColor: "#4f46e5",
+      strokeOpacity: 0.8,
+      strokeWeight: 5,
+      map: googleMap,
+    });
+
+    routePolylines[vehicle.id] = polyline;
+
+    // Fit bounds to route
+    const bounds = new google.maps.LatLngBounds();
+    path.forEach((p) => bounds.extend(p));
+    googleMap.fitBounds(bounds);
+  }
+
+  function focusOnVehicle(vehicleId) {
+    const vehicle = activeVehicles.find((v) => v.id === vehicleId);
+    if (vehicle && vehicle.route?.route?.polyline && googleMap) {
+      const pos = vehicle.route.route.polyline[0];
+      googleMap.panTo({ lat: pos.lat, lng: pos.lng });
+      googleMap.setZoom(16);
+    }
+  }
+
+  async function completeJourney(vehicleId) {
+    if (!confirm("Mark mission as complete?")) return;
+
+    try {
+      const response = await fetch(`/api/emergency/complete/${vehicleId}`, {
+        method: "POST",
+      });
+      if (response.ok) {
+        showNotification("Mission completed successfully", "success");
+        selectedVehicle = null;
+        loadActiveVehicles();
+        document.getElementById("vehicle-details").innerHTML = `
+                    <div class="text-center py-5 text-muted">
+                        <div class="icon-circle mx-auto mb-3" style="width: 60px; height: 60px;">
+                            <i class="fas fa-mouse-pointer"></i>
+                        </div>
+                        <p>Select a vehicle to view live telemetry and route details</p>
+                    </div>`;
+        if (routePolylines[vehicleId]) {
+          routePolylines[vehicleId].setMap(null);
+          delete routePolylines[vehicleId];
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      showNotification("Error completing mission", "danger");
+    }
+  }
+
+  async function useMyLocation() {
+    if (!navigator.geolocation) {
+      showNotification("Geolocation not supported", "warning");
+      return;
+    }
+
+    const btn = event.currentTarget;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
         try {
-          const location = await MapUtils.getCurrentLocation();
-          const response = await fetch("/api/reverse_geocode", {
+          const res = await fetch("/api/reverse_geocode", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat: location.lat, lng: location.lng }),
+            body: JSON.stringify({ lat, lng }),
           });
-
-          const data = await response.json();
-          document.getElementById("currentLocation").value = data.address;
-
-          // Add marker
-          if (currentLocationMarker) {
-            currentLocationMarker.setMap(null);
-          }
-
-          currentLocationMarker = MapUtils.addMarker(
-            location.lat,
-            location.lng,
-            "Current Location",
-            {
-              url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-              scaledSize: new google.maps.Size(40, 40),
-            }
-          );
-
-          map.setCenter(location);
-          map.setZoom(15);
-
-          MapUtils.showNotification("Location set!", "success");
-        } catch (error) {
-          console.error("Error getting location:", error);
-          MapUtils.showNotification("Could not get your location", "error");
+          const data = await res.json();
+          document.getElementById("currentLocation").value =
+            data.address || `${lat}, ${lng}`;
+          btn.innerHTML = originalHtml;
+        } catch (e) {
+          document.getElementById("currentLocation").value = `${lat}, ${lng}`;
+          btn.innerHTML = originalHtml;
         }
+      },
+      () => {
+        showNotification("Location access denied", "danger");
+        btn.innerHTML = originalHtml;
       }
+    );
+  }
 
-      // Register emergency vehicle
-      document
-        .getElementById("emergency-form")
-        .addEventListener("submit", async (e) => {
-          e.preventDefault();
+  document
+    .getElementById("emergency-form")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button[type="submit"]');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML =
+        '<i class="fas fa-spinner fa-spin me-2"></i>Initializing...';
+      btn.disabled = true;
 
-          const vehicleId = document.getElementById("vehicleId").value;
-          const vehicleType = document.getElementById("vehicleType").value;
-          const currentLocation =
-            document.getElementById("currentLocation").value;
-          const destination = document.getElementById("destination").value;
+      try {
+        const data = {
+          vehicle_id: document.getElementById("vehicleId").value,
+          vehicle_type: document.getElementById("vehicleType").value,
+          current_location: document.getElementById("currentLocation").value,
+          destination: document.getElementById("destination").value,
+        };
 
-          try {
-            const response = await fetch("/api/emergency/register", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                vehicle_id: vehicleId,
-                vehicle_type: vehicleType,
-                current_location: currentLocation,
-                destination: destination,
-              }),
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-              MapUtils.showNotification(
-                "Emergency vehicle registered!",
-                "success"
-              );
-              document.getElementById("emergency-form").reset();
-              loadActiveVehicles();
-              displayVehicleRoute(data);
-            } else {
-              MapUtils.showNotification(
-                "Registration failed: " + data.error,
-                "error"
-              );
-            }
-          } catch (error) {
-            console.error("Error registering vehicle:", error);
-            MapUtils.showNotification("Failed to register vehicle", "error");
-          }
+        const response = await fetch("/api/emergency/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
         });
 
-      // Load active vehicles
-      async function loadActiveVehicles() {
-        try {
-          const response = await fetch("/api/emergency/all_active");
-          const data = await response.json();
-
-          activeVehicles = data.vehicles;
-          updateVehiclesList();
-          updateVehicleMarkers();
-        } catch (error) {
-          console.error("Error loading vehicles:", error);
+        if (response.ok) {
+          showNotification("Emergency mission started", "success");
+          e.target.reset();
+          loadActiveVehicles();
+        } else {
+          throw new Error("Registration failed");
         }
+      } catch (error) {
+        showNotification(error.message, "danger");
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
       }
+    });
 
-      // Update vehicles list
-      function updateVehiclesList() {
-        const container = document.getElementById("active-vehicles");
+  window.addEventListener("load", initializeMap);
+  setInterval(loadActiveVehicles, 5000);
+</script>
 
-        if (activeVehicles.length === 0) {
-          container.innerHTML =
-            '<p class="text-center" style="color: var(--text-secondary);">No active emergency vehicles</p>';
-          return;
-        }
-
-        container.innerHTML = activeVehicles
-          .map((vehicle) => {
-            const typeIcon = {
-              ambulance: "🚑",
-              fire_truck: "🚒",
-              police: "🚓",
-            };
-
-            const etaText = vehicle.eta
-              ? `ETA: ${Math.round(
-                  vehicle.eta.eta_minutes
-                )} min (${vehicle.eta.distance_km.toFixed(1)} km)`
-              : "Calculating...";
-
-            return `
-                    <div class="card" style="margin-bottom: 1rem; padding: 1rem; cursor: pointer;"
-                         onclick="focusOnVehicle('${vehicle.id}')">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <h4 style="margin: 0 0 0.5rem 0;">
-                                    ${typeIcon[vehicle.type] || "🚗"} ${
-              vehicle.id
-            }
-                                </h4>
-                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">
-                                    ${vehicle.type
-                                      .replace("_", " ")
-                                      .toUpperCase()}
-                                </p>
-                                <p style="margin: 0.25rem 0; font-size: 0.875rem;">
-                                    ${etaText}
-                                </p>
-                            </div>
-                            <div>
-                                <span class="badge badge-success">ACTIVE</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-          })
-          .join("");
-      }
-
-      // Update vehicle markers on map
-      function updateVehicleMarkers() {
-        // Clear existing markers
-        Object.values(vehicleMarkers).forEach((marker) => marker.setMap(null));
-        vehicleMarkers = {};
-
-        activeVehicles.forEach((vehicle) => {
-          if (vehicle.route && vehicle.route.route) {
-            // Add start marker
-            const startIcon = {
-              url:
-                vehicle.type === "ambulance"
-                  ? "https://maps.google.com/mapfiles/ms/icons/red-dot.png"
-                  : "https://maps.google.com/mapfiles/ms/icons/orange-dot.png",
-              scaledSize: new google.maps.Size(50, 50),
-            };
-
-            // Extract coordinates from current_location
-            // For simplicity, we'll use the polyline start point
-            if (
-              vehicle.route.route.polyline &&
-              vehicle.route.route.polyline.length > 0
-            ) {
-              const startPoint = vehicle.route.route.polyline[0];
-
-              const marker = MapUtils.addMarker(
-                startPoint.lat,
-                startPoint.lng,
-                vehicle.id,
-                startIcon,
-                `
-                                <div style="padding: 10px; max-width: 250px;">
-                                    <h4 style="margin: 0 0 10px 0;">${
-                                      vehicle.id
-                                    }</h4>
-                                    <p style="margin: 5px 0;"><strong>Type:</strong> ${vehicle.type.replace(
-                                      "_",
-                                      " "
-                                    )}</p>
-                                    <p style="margin: 5px 0;"><strong>Status:</strong> ${
-                                      vehicle.status
-                                    }</p>
-                                    <p style="margin: 5px 0;"><strong>Distance:</strong> ${
-                                      vehicle.route.route.distance
-                                    }</p>
-                                    <p style="margin: 5px 0;"><strong>Duration:</strong> ${
-                                      vehicle.route.route.duration
-                                    }</p>
-                                </div>
-                            `
-              );
-
-              vehicleMarkers[vehicle.id] = marker;
-            }
-          }
-        });
-      }
-
-      // Display vehicle route
-      function displayVehicleRoute(vehicle) {
-        if (
-          vehicle.route &&
-          vehicle.route.route &&
-          vehicle.route.route.polyline
-        ) {
-          const polyline = vehicle.route.route.polyline;
-
-          // Draw route
-          const path = polyline.map((point) => ({
-            lat: point.lat,
-            lng: point.lng,
-          }));
-
-          const routePath = new google.maps.Polyline({
-            path: path,
-            geodesic: true,
-            strokeColor: "#ef4444",
-            strokeOpacity: 0.8,
-            strokeWeight: 5,
-            map: map,
-          });
-
-          // Fit bounds to show entire route
-          const bounds = new google.maps.LatLngBounds();
-          path.forEach((point) => bounds.extend(point));
-          map.fitBounds(bounds);
-        }
-      }
-
-      // Focus on specific vehicle
-      function focusOnVehicle(vehicleId) {
-        const vehicle = activeVehicles.find((v) => v.id === vehicleId);
-
-        if (vehicle) {
-          // Show vehicle details
-          const detailsContainer = document.getElementById("vehicle-details");
-
-          const etaText = vehicle.eta
-            ? `${Math.round(
-                vehicle.eta.eta_minutes
-              )} minutes (${vehicle.eta.distance_km.toFixed(1)} km)`
-            : "Calculating...";
-
-          detailsContainer.innerHTML = `
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
-                        <div>
-                            <h4 style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem;">VEHICLE ID</h4>
-                            <p style="font-size: 1.25rem; font-weight: 600; margin: 0;">${
-                              vehicle.id
-                            }</p>
-                        </div>
-                        <div>
-                            <h4 style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem;">TYPE</h4>
-                            <p style="font-size: 1.25rem; font-weight: 600; margin: 0;">${vehicle.type
-                              .replace("_", " ")
-                              .toUpperCase()}</p>
-                        </div>
-                        <div>
-                            <h4 style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem;">ETA</h4>
-                            <p style="font-size: 1.25rem; font-weight: 600; margin: 0;">${etaText}</p>
-                        </div>
-                        <div>
-                            <h4 style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem;">STATUS</h4>
-                            <p style="font-size: 1.25rem; font-weight: 600; margin: 0;">
-                                <span class="badge badge-success">ACTIVE</span>
-                            </p>
-                        </div>
-                    </div>
-                    <div style="margin-top: 1.5rem;">
-                        <button class="btn btn-danger" onclick="completeJourney('${
-                          vehicle.id
-                        }')">
-                            Complete Journey
-                        </button>
-                    </div>
-                `;
-
-          // Focus map on vehicle
-          if (vehicleMarkers[vehicleId]) {
-            map.setCenter(vehicleMarkers[vehicleId].getPosition());
-            map.setZoom(15);
-          }
-
-          // Redraw route
-          displayVehicleRoute(vehicle);
-        }
-      }
-
-      // Complete journey
-      async function completeJourney(vehicleId) {
-        try {
-          const response = await fetch(`/api/emergency/complete/${vehicleId}`, {
-            method: "POST",
-          });
-
-          if (response.ok) {
-            MapUtils.showNotification("Journey completed!", "success");
-            loadActiveVehicles();
-            document.getElementById("vehicle-details").innerHTML =
-              '<p class="text-center" style="color: var(--text-secondary);">Select a vehicle to view details</p>';
-          }
-        } catch (error) {
-          console.error("Error completing journey:", error);
-          MapUtils.showNotification("Failed to complete journey", "error");
-        }
-      }
-
-      // Initialize
-      window.addEventListener("load", initializeMap);
-
-      // Auto-refresh every 10 seconds
-      setInterval(loadActiveVehicles, 10000);
-    </script>
-  </body>
-</html>
+<script
+  src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&callback=initializeMap&loading=async"
+  async
+  defer
+></script>
+{% endblock %}

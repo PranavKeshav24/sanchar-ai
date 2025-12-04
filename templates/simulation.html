@@ -1,79 +1,268 @@
-{% extends "base.html" %}
+{% extends "base1.html" %} {% block content %}
+<div class="container-fluid px-4 py-4">
+  <div class="hero-section text-center mb-4">
+    <h1 class="display-5 fw-bold gradient-text">6G Traffic Simulation</h1>
+    <p class="lead text-secondary">
+      Real-time V2X communication and traffic flow analysis
+    </p>
+  </div>
 
-{% block content %}
-<div class="simulation-container">
-    <h1>6G Vehicle Communication Simulation</h1>
-    
-    <div class="simulation-controls">
-        <button id="start-btn" class="btn btn-primary">Start Simulation</button>
-        <button id="stop-btn" class="btn btn-danger">Stop Simulation</button>
-        <button id="clear-btn" class="btn btn-warning">Clear All Vehicles</button>
-    </div>
-    
-    <div class="vehicle-controls">
-        <h3>Add Vehicles to Roads</h3>
-        <div class="control-group">
-            <button id="add-north-btn" class="btn btn-control">Add Vehicles (North)</button>
-            <button id="add-south-btn" class="btn btn-control">Add Vehicles (South)</button>
-            <button id="add-east-btn" class="btn btn-control">Add Vehicles (East)</button>
-            <button id="add-west-btn" class="btn btn-control">Add Vehicles (West)</button>
+  <div class="row g-4">
+    <!-- Left Control Panel -->
+    <div class="col-lg-3">
+      <div class="glass-card mb-4">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-gamepad me-2"></i>Main Controls</h5>
         </div>
-    </div>
-    
-    <div class="ambulance-controls">
-        <h3>Add Ambulance with Priority</h3>
-        <div class="control-group">
-            <button id="ambulance-north-btn" class="btn btn-control btn-emergency">Ambulance (North)</button>
-            <button id="ambulance-south-btn" class="btn btn-control btn-emergency">Ambulance (South)</button>
-            <button id="ambulance-east-btn" class="btn btn-control btn-emergency">Ambulance (East)</button>
-            <button id="ambulance-west-btn" class="btn btn-control btn-emergency">Ambulance (West)</button>
+        <div class="d-grid gap-2">
+          <button id="start-btn" class="btn btn-primary custom-btn">
+            <i class="fas fa-play me-2"></i>Start Simulation
+          </button>
+          <button id="stop-btn" class="btn btn-danger custom-btn" disabled>
+            <i class="fas fa-stop me-2"></i>Stop Simulation
+          </button>
+          <button id="clear-btn" class="btn btn-warning custom-btn text-dark">
+            <i class="fas fa-trash-alt me-2"></i>Clear Vehicles
+          </button>
         </div>
-    </div>
-    
-    <div class="simulation-content">
-        <div class="simulation-canvas-container">
-            <canvas id="simulation-canvas" width="1000" height="1000"></canvas>
+      </div>
+
+      <div class="glass-card mb-4">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-car me-2"></i>Add Traffic</h5>
         </div>
-        
-        <div class="simulation-sidebar">
-            <div class="info-panel">
-                <h3>Vehicle Information</h3>
-                <div id="vehicle-info">
-                    <p>Select a vehicle to see details</p>
-                </div>
-            </div>
-            
-            <div class="events-panel">
-                <h3>Simulation Events</h3>
-                <div id="events-list">
-                    <p>No events yet</p>
-                </div>
-            </div>
-            
-            <div class="traffic-lights-panel">
-                <h3>Traffic Signals</h3>
-                <div class="traffic-light">
-                    <div class="light north">
-                        <span>North:</span>
-                        <div class="signal" id="north-light">Red</div>
-                    </div>
-                    <div class="light south">
-                        <span>South:</span>
-                        <div class="signal" id="south-light">Red</div>
-                    </div>
-                    <div class="light east">
-                        <span>East:</span>
-                        <div class="signal" id="east-light">Green</div>
-                    </div>
-                    <div class="light west">
-                        <span>West:</span>
-                        <div class="signal" id="west-light">Red</div>
-                    </div>
-                </div>
-            </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <button
+              id="add-north-btn"
+              class="btn btn-outline-light w-100 btn-sm"
+            >
+              North ⬇️
+            </button>
+          </div>
+          <div class="col-6">
+            <button
+              id="add-south-btn"
+              class="btn btn-outline-light w-100 btn-sm"
+            >
+              South ⬆️
+            </button>
+          </div>
+          <div class="col-6">
+            <button
+              id="add-east-btn"
+              class="btn btn-outline-light w-100 btn-sm"
+            >
+              East ⬅️
+            </button>
+          </div>
+          <div class="col-6">
+            <button
+              id="add-west-btn"
+              class="btn btn-outline-light w-100 btn-sm"
+            >
+              West ➡️
+            </button>
+          </div>
         </div>
+      </div>
+
+      <div class="glass-card">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-ambulance me-2"></i>Emergency</h5>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <button
+              id="ambulance-north-btn"
+              class="btn btn-outline-danger w-100 btn-sm"
+            >
+              North 🚑
+            </button>
+          </div>
+          <div class="col-6">
+            <button
+              id="ambulance-south-btn"
+              class="btn btn-outline-danger w-100 btn-sm"
+            >
+              South 🚑
+            </button>
+          </div>
+          <div class="col-6">
+            <button
+              id="ambulance-east-btn"
+              class="btn btn-outline-danger w-100 btn-sm"
+            >
+              East 🚑
+            </button>
+          </div>
+          <div class="col-6">
+            <button
+              id="ambulance-west-btn"
+              class="btn btn-outline-danger w-100 btn-sm"
+            >
+              West 🚑
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- Center Canvas -->
+    <div class="col-lg-6">
+      <div
+        class="glass-card p-2 h-100 d-flex align-items-center justify-content-center bg-dark"
+      >
+        <div class="canvas-container">
+          <canvas id="simulation-canvas" width="800" height="800"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Info Panel -->
+    <div class="col-lg-3">
+      <div class="glass-card mb-4">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-info-circle me-2"></i>Vehicle Details</h5>
+        </div>
+        <div id="vehicle-info" class="info-box">
+          <p class="text-muted text-center my-4">
+            <i class="fas fa-mouse-pointer mb-2 d-block fa-2x"></i>
+            Click on a vehicle to see details
+          </p>
+        </div>
+      </div>
+
+      <div class="glass-card mb-4">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-traffic-light me-2"></i>Signal Status</h5>
+        </div>
+        <div class="traffic-grid">
+          <div class="signal-item">
+            <span class="badge bg-secondary mb-1">North</span>
+            <div class="signal-light" id="north-light" data-color="red"></div>
+          </div>
+          <div class="signal-item">
+            <span class="badge bg-secondary mb-1">South</span>
+            <div class="signal-light" id="south-light" data-color="red"></div>
+          </div>
+          <div class="signal-item">
+            <span class="badge bg-secondary mb-1">East</span>
+            <div class="signal-light" id="east-light" data-color="green"></div>
+          </div>
+          <div class="signal-item">
+            <span class="badge bg-secondary mb-1">West</span>
+            <div class="signal-light" id="west-light" data-color="red"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-card flex-grow-1">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-history me-2"></i>Event Log</h5>
+        </div>
+        <div id="events-list" class="events-container custom-scrollbar">
+          <p class="text-muted small text-center">
+            Simulation events will appear here...
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<style>
+  .canvas-container {
+    width: 100%;
+    height: 0;
+    padding-bottom: 100%; /* Aspect ratio 1:1 */
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+  }
+
+  #simulation-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #2c3e50;
+  }
+
+  .info-box {
+    min-height: 150px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1rem;
+  }
+
+  .traffic-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .signal-item {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0.5rem;
+    border-radius: 8px;
+  }
+
+  .signal-light {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin: 0 auto;
+    background: #333;
+    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s ease;
+  }
+
+  .signal-light[data-color="red"] {
+    background: #ff4444;
+    box-shadow: 0 0 10px #ff4444;
+  }
+  .signal-light[data-color="yellow"] {
+    background: #ffbb33;
+    box-shadow: 0 0 10px #ffbb33;
+  }
+  .signal-light[data-color="green"] {
+    background: #00c851;
+    box-shadow: 0 0 10px #00c851;
+  }
+
+  .events-container {
+    height: 200px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+  }
+
+  .event-item {
+    padding: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 0.25rem;
+  }
+
+  .vehicle-details .detail-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0.25rem;
+  }
+
+  .vehicle-details .label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .vehicle-details .value {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+</style>
 
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 {% endblock %}

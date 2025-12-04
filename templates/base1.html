@@ -20,22 +20,13 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='css/style1.css') }}"
     />
+    {% block head %}{% endblock %}
   </head>
   <body>
-    <nav
-      class="navbar navbar-expand-lg navbar-dark"
-      style="
-        background: var(--bg-primary);
-        border-bottom: 1px solid var(--border-color);
-      "
-    >
-      <div class="container">
-        <a
-          class="navbar-brand"
-          href="{{ url_for('index') }}"
-          style="color: var(--text-primary)"
-        >
-          <i class="fas fa-robot"></i> Sanchar AI Detection
+    <nav class="navbar navbar-expand-lg navbar-custom sticky-top">
+      <div class="container-fluid px-4">
+        <a class="navbar-brand" href="{{ url_for('index') }}">
+          <i class="fas fa-robot me-2"></i>Sanchar AI
         </a>
         <button
           class="navbar-toggler"
@@ -46,52 +37,124 @@
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
-          <ul class="navbar-nav ms-auto">
+          <ul class="navbar-nav ms-auto align-items-center">
+            {% if session.user_id %}
             <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('dashboard') }}"
+                >Dashboard</a
+              >
+            </li>
+            <li class="nav-item dropdown">
               <a
-                class="nav-link"
-                href="{{ url_for('index') }}"
-                style="color: var(--text-primary)"
-                >Home</a
+                class="nav-link dropdown-toggle"
+                href="#"
+                id="mapsDropdown"
+                role="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                Maps
+              </a>
+              <ul
+                class="dropdown-menu dropdown-menu-end glass-dropdown"
+                aria-labelledby="mapsDropdown"
+              >
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('map_dashboard') }}"
+                    >Interactive Map</a
+                  >
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('pothole_map') }}"
+                    >Pothole Map</a
+                  >
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('accident_map') }}"
+                    >Accident Map</a
+                  >
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('emergency_tracking') }}"
+                >Emergency</a
               >
             </li>
             <li class="nav-item">
-              <a
-                class="nav-link"
-                href="{{ url_for('live_detection') }}"
-                style="color: var(--text-primary)"
-                >Live Detection</a
+              <a class="nav-link" href="{{ url_for('simulation') }}"
+                >Simulation</a
               >
+            </li>
+            <li class="nav-item dropdown">
+              <a
+                class="nav-link dropdown-toggle"
+                href="#"
+                id="detectionDropdown"
+                role="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                AI Detection
+              </a>
+              <ul
+                class="dropdown-menu dropdown-menu-end glass-dropdown"
+                aria-labelledby="detectionDropdown"
+              >
+                <li>
+                  <a
+                    class="dropdown-item"
+                    href="{{ url_for('live_detection') }}"
+                    >Live Detection</a
+                  >
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('video_upload') }}"
+                    >Video Analysis</a
+                  >
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('complaints') }}"
+                    >Complaints</a
+                  >
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item ms-lg-3">
+              <button
+                class="btn btn-outline-warning btn-sm rounded-pill px-3 me-2"
+                onclick="toggleFieldMode()"
+              >
+                <i class="fas fa-tablet-alt me-2"></i>Field Mode
+              </button>
+              <a
+                class="btn btn-outline-danger btn-sm rounded-pill px-3"
+                href="{{ url_for('logout') }}"
+                >Logout</a
+              >
+            </li>
+            {% else %}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('index') }}">Home</a>
             </li>
             <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+            </li>
+            <li class="nav-item ms-lg-2">
               <a
-                class="nav-link"
-                href="{{ url_for('video_upload') }}"
-                style="color: var(--text-primary)"
-                >Video Analysis</a
+                class="btn btn-primary btn-sm rounded-pill px-4"
+                href="{{ url_for('register') }}"
+                >Register</a
               >
             </li>
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                href="{{ url_for('complaints') }}"
-                style="color: var(--text-primary)"
-                >Complaints</a
-              >
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                href="{{ url_for('map_dashboard') }}"
-                style="color: var(--text-primary)"
-                >Map View</a
-              >
-            </li>
+            {% endif %}
           </ul>
         </div>
       </div>
     </nav>
 
+    <!-- Flash Messages Container -->
     <div class="container mt-4">
       {% with messages = get_flashed_messages() %} {% if messages %} {% for
       message in messages %}
@@ -103,16 +166,13 @@
           data-bs-dismiss="alert"
         ></button>
       </div>
-      {% endfor %} {% endif %} {% endwith %} {% block content %}{% endblock %}
+      {% endfor %} {% endif %} {% endwith %}
     </div>
 
-    <footer
-      class="footer mt-5"
-      style="
-        background: var(--bg-primary);
-        border-top: 1px solid var(--border-color);
-      "
-    >
+    <!-- Main Content -->
+    {% block content %}{% endblock %}
+
+    <footer class="footer mt-5">
       <div class="container text-center py-4">
         <p style="color: var(--text-secondary); margin: 0">
           &copy; 2024 Sanchar AI Detection System. All rights reserved.
@@ -121,7 +181,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/script1.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/theme-manager.js') }}?v=2.0"></script>
+    <script src="{{ url_for('static', filename='js/script1.js') }}?v=2.0"></script>
   </body>
 </html>

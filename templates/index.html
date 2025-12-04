@@ -1,112 +1,159 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base1.html" %} {% block content %}
+<!-- Hero Section -->
 <div class="hero">
   <div class="hero-content">
-    <h1>Sanchar AI - Smart Traffic Management</h1>
+    <div class="hero-icon">🚗</div>
+    <h1>Sanchar AI</h1>
+    <p class="hero-subtitle">Next-Generation Smart Traffic Management</p>
     <p>
-      Experience the future of intelligent traffic management with real-time
-      detection, emergency vehicle routing, and AI-powered predictions using
-      Google Maps integration
+      AI-powered traffic monitoring with real-time detection, 3D visualization,
+      emergency routing & intelligent predictions —
+      <span style="color: var(--accent-success); font-weight: 600"
+        >100% Open Source</span
+      >
     </p>
+
     <div class="hero-buttons">
-      <a href="{{ url_for('login') }}" class="btn btn-primary">Get Started</a>
-      <a href="#features" class="btn btn-secondary">Learn More</a>
+      <a href="{{ url_for('login') }}" class="btn btn-primary"
+        >🚀 Get Started Free</a
+      >
+      <a href="#features" class="btn btn-secondary">📖 Explore Features</a>
+    </div>
+
+    <div class="hero-badges">
+      <div class="badge-item"><span>✨</span> No API Keys Required</div>
+      <div class="badge-item"><span>🌍</span> 3D Globe Visualization</div>
+      <div class="badge-item"><span>🤖</span> YOLOv5 AI Detection</div>
     </div>
   </div>
 </div>
 
+<!-- Features Section -->
 <div class="features" id="features">
-  <div class="feature">
-    <h3>🗺️ Real-Time Mapping</h3>
-    <p>
-      Interactive Google Maps integration with live traffic data, terrain
-      visualization, and geolocation services for accurate detection reporting
+  <div style="grid-column: 1 / -1; text-align: center; margin-bottom: 2rem">
+    <span class="badge badge-info">✨ POWERFUL FEATURES</span>
+    <h2 style="margin-top: 1rem; font-size: 2.5rem; font-weight: 800">
+      Everything You Need for Smart Traffic
+    </h2>
+    <p style="color: var(--text-secondary); max-width: 600px; margin: 0 auto">
+      Comprehensive tools for traffic management, emergency response, and
+      infrastructure monitoring
     </p>
   </div>
+
+  <!-- Feature Cards -->
   <div class="feature">
-    <h3>🚨 Emergency Routing</h3>
+    <div class="feature-icon">🌍</div>
+    <h3>2D/3D Interactive Maps</h3>
     <p>
-      Optimized emergency vehicle routing with traffic-aware navigation,
-      automatic signal management, and real-time ETA calculations
+      Switch seamlessly between Leaflet 2D maps and stunning CesiumJS 3D Globe —
+      like Google Earth, but completely free and open source!
     </p>
   </div>
+
   <div class="feature">
-    <h3>🤖 AI Detection</h3>
+    <div class="feature-icon">🚨</div>
+    <h3>Emergency Response</h3>
     <p>
-      Advanced computer vision for real-time pothole and accident detection with
-      automatic complaint generation and location tracking
+      OSRM-powered optimal routing for ambulances, fire trucks & police.
+      Real-time ETA tracking with traffic-aware navigation.
     </p>
   </div>
+
   <div class="feature">
-    <h3>🚦 Traffic Simulation</h3>
+    <div class="feature-icon">🤖</div>
+    <h3>AI Detection Engine</h3>
     <p>
-      Sophisticated 6G V2X communication simulation with AI-powered traffic
-      prediction and emergency vehicle priority management
+      YOLOv5 computer vision for real-time pothole and accident detection from
+      live camera feeds or uploaded videos.
     </p>
   </div>
+
   <div class="feature">
-    <h3>📍 Geolocation Services</h3>
+    <div class="feature-icon">🏢</div>
+    <h3>3D Building Visualization</h3>
     <p>
-      Precise location tracking with address geocoding, reverse geocoding, and
-      nearby facility search (hospitals, police stations)
+      Explore cities with realistic 3D building models powered by Cesium OSM
+      Buildings — adds immersive context to your maps.
     </p>
   </div>
+
   <div class="feature">
-    <h3>🌓 Modern Interface</h3>
+    <div class="feature-icon">📍</div>
+    <h3>Smart Geolocation</h3>
     <p>
-      Beautiful, responsive UI with light/dark theme support, real-time data
-      visualization, and intuitive navigation
+      Nominatim-powered geocoding with address lookup, reverse geocoding, and
+      find nearby hospitals & emergency services.
+    </p>
+  </div>
+
+  <div class="feature">
+    <div class="feature-icon">🌓</div>
+    <h3>Modern Dark/Light UI</h3>
+    <p>
+      Beautiful glassmorphism design with seamless theme switching. Maps
+      automatically adapt to your preferred theme.
     </p>
   </div>
 </div>
 
-<div
-  class="dashboard"
-  style="
-    background: var(--bg-primary);
-    padding: 4rem 2rem;
-    margin: 2rem auto;
-    max-width: 1400px;
-    border-radius: var(--radius-xl);
-  "
->
-  <h2
-    style="text-align: center; margin-bottom: 3rem; color: var(--text-primary)"
-  >
-    System Capabilities
-  </h2>
+<!-- Stats Section -->
+<div class="stats-section">
+  <div class="stats-grid" style="max-width: 1200px; margin: 0 auto">
+    <div class="stat-item">
+      <h4>Open Source</h4>
+      <p>100%</p>
+    </div>
+    <div class="stat-item">
+      <h4>API Keys Required</h4>
+      <p>0</p>
+    </div>
+    <div class="stat-item">
+      <h4>Map Views</h4>
+      <p>2D+3D</p>
+    </div>
+    <div class="stat-item">
+      <h4>YOLOv5 Detection</h4>
+      <p>AI</p>
+    </div>
+  </div>
+</div>
 
-  <div
-    style="
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 2rem;
-    "
-  >
+<!-- Capabilities Section -->
+<div class="dashboard">
+  <div class="text-center mb-4">
+    <span class="badge badge-success">🛠️ SYSTEM CAPABILITIES</span>
+    <h2 style="margin-top: 1rem; font-size: 2.5rem; font-weight: 800">
+      Full-Stack Traffic Solution
+    </h2>
+  </div>
+
+  <div class="dashboard-cards">
     <div class="card">
-      <h3>🌍 Google Maps Integration</h3>
-      <ul style="color: var(--text-secondary); line-height: 2">
-        <li>Real-time traffic layer</li>
-        <li>Satellite & terrain views</li>
-        <li>Street view integration</li>
-        <li>Places API for facilities</li>
-        <li>Distance Matrix API</li>
+      <h3><span>🌍</span> Map Technology</h3>
+      <ul>
+        <li>2D Maps (Leaflet + OpenStreetMap)</li>
+        <li>3D Globe (CesiumJS)</li>
+        <li>3D Buildings visualization</li>
+        <li>Theme-aware map styles</li>
+        <li>OSRM routing engine</li>
       </ul>
     </div>
 
     <div class="card">
-      <h3>🚑 Emergency Features</h3>
-      <ul style="color: var(--text-secondary); line-height: 2">
+      <h3><span>🚑</span> Emergency Features</h3>
+      <ul>
         <li>Vehicle registration & tracking</li>
-        <li>Multiple route alternatives</li>
-        <li>Traffic-aware routing</li>
+        <li>Optimal route calculation</li>
         <li>Real-time ETA updates</li>
-        <li>Automatic signal priority</li>
+        <li>Journey completion tracking</li>
+        <li>Multiple vehicle types</li>
       </ul>
     </div>
 
     <div class="card">
-      <h3>🔍 Detection System</h3>
-      <ul style="color: var(--text-secondary); line-height: 2">
+      <h3><span>🔍</span> Detection System</h3>
+      <ul>
         <li>YOLOv5-based detection</li>
         <li>Live camera feed analysis</li>
         <li>Video upload processing</li>
@@ -114,6 +161,26 @@
         <li>Automatic complaint filing</li>
       </ul>
     </div>
+  </div>
+</div>
+
+<!-- CTA Section -->
+<div class="cta-section">
+  <h2>Ready to Transform Traffic Management?</h2>
+  <p>
+    Get started in minutes with zero configuration. No API keys, no credit cards
+    — just pure open-source power.
+  </p>
+  <div class="hero-buttons">
+    <a
+      href="{{ url_for('register') }}"
+      class="btn btn-primary"
+      style="background: white; color: var(--accent-primary)"
+      >🚀 Create Free Account</a
+    >
+    <a href="{{ url_for('login') }}" class="btn btn-secondary"
+      >Already have an account? Login</a
+    >
   </div>
 </div>
 {% endblock %}

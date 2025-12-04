@@ -9,5 +9,9 @@ pandas==2.0.3
 Pillow==10.1.0
 requests==2.31.0
 python-dotenv==1.0.0
-googlemaps==4.10.0
 geopy==2.4.0
+polyline==2.0.0
+earthengine-api==0.1.382
+google-auth==2.25.2
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
