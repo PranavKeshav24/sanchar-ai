@@ -12,6 +12,40 @@ from typing import Dict, List, Optional, Tuple
 import math
 
 
+def decode_polyline(polyline_str):
+    """Decode Google Maps polyline string to list of coordinates"""
+    index, lat, lng = 0, 0, 0
+    coordinates = []
+    changes = {'latitude': 0, 'longitude': 0}
+    
+    while index < len(polyline_str):
+        for unit in ['latitude', 'longitude']:
+            shift, result = 0, 0
+            
+            while True:
+                byte = ord(polyline_str[index]) - 63
+                index += 1
+                result |= (byte & 0x1f) << shift
+                shift += 5
+                if byte < 0x20:
+                    break
+            
+            if result & 1:
+                changes[unit] = ~(result >> 1)
+            else:
+                changes[unit] = result >> 1
+        
+        lat += changes['latitude']
+        lng += changes['longitude']
+        
+        coordinates.append({
+            'lat': lat / 1e5,
+            'lng': lng / 1e5
+        })
+    
+    return coordinates
+
+
 class GoogleMapsService:
     """Google Maps API integration for geocoding and routing"""
     
@@ -388,18 +422,35 @@ class EmergencyVehicleTracker:
     
     def register_vehicle(self, vehicle_id: str, vehicle_type: str, current_location: str, destination: str) -> Dict:
         """Register new emergency vehicle"""
-        route = self.maps_service.get_route(current_location, destination)
+        route_data = self.maps_service.get_route(current_location, destination)
         
-        if route:
+        if route_data:
+            # Decode polyline to get actual coordinates
+            from google_maps_service import decode_polyline
+            polyline_coords = decode_polyline(route_data['polyline'])
+            
+            # Calculate ETA in minutes
+            eta_minutes = route_data['duration_value'] / 60
+            distance_km = route_data['distance_value'] / 1000
+            
             self.active_vehicles[vehicle_id] = {
-                'vehicle_id': vehicle_id,
-                'vehicle_type': vehicle_type,
+                'id': vehicle_id,
+                'type': vehicle_type,
                 'current_location': current_location,
                 'destination': destination,
-                'route': route,
+                'route': {
+                    'route': {
+                        'polyline': polyline_coords,
+                        'distance': route_data['distance'],
+                        'duration': route_data['duration']
+                    }
+                },
+                'eta': {
+                    'eta_minutes': eta_minutes,
+                    'distance_km': distance_km
+                },
                 'status': 'active',
-                'registered_at': datetime.now().isoformat(),
-                'eta': route['duration']
+                'registered_at': datetime.now().isoformat()
             }
             
             return self.active_vehicles[vehicle_id]
@@ -416,10 +467,25 @@ class EmergencyVehicleTracker:
         vehicle['current_location'] = new_location
         
         # Recalculate route
-        new_route = self.maps_service.get_route(new_location, vehicle['destination'])
-        if new_route:
-            vehicle['route'] = new_route
-            vehicle['eta'] = new_route['duration']
+        route_data = self.maps_service.get_route(new_location, vehicle['destination'])
+        if route_data:
+            from google_maps_service import decode_polyline
+            polyline_coords = decode_polyline(route_data['polyline'])
+            
+            eta_minutes = route_data['duration_value'] / 60
+            distance_km = route_data['distance_value'] / 1000
+            
+            vehicle['route'] = {
+                'route': {
+                    'polyline': polyline_coords,
+                    'distance': route_data['distance'],
+                    'duration': route_data['duration']
+                }
+            }
+            vehicle['eta'] = {
+                'eta_minutes': eta_minutes,
+                'distance_km': distance_km
+            }
             vehicle['updated_at'] = datetime.now().isoformat()
         
         return vehicle

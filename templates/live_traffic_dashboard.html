@@ -1,0 +1,716 @@
+{% extends "base1.html" %} {% block content %}
+<div class="container-fluid px-4 py-4">
+  <div class="hero-section text-center mb-4">
+    <h1 class="display-5 fw-bold gradient-text">Live Traffic Monitoring</h1>
+    <p class="lead text-secondary">
+      Real-time city-wide traffic monitoring and analytics
+    </p>
+  </div>
+
+  <div class="row g-4">
+    <!-- Left Panel: Stats & Controls -->
+    <div class="col-lg-3">
+      <!-- City Stats Card -->
+      <div class="glass-card mb-4">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-chart-line me-2"></i>Live Stats</h5>
+        </div>
+        <div class="stat-grid mb-3">
+          <div class="stat-item">
+            <div class="stat-label">Active Vehicles</div>
+            <div class="stat-value" id="active-vehicles-count">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Avg Speed</div>
+            <div class="stat-value" id="avg-speed">
+              0 <span class="small">km/h</span>
+            </div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Congestion</div>
+            <div class="stat-value text-success" id="congestion-level">Low</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Incidents</div>
+            <div class="stat-value text-danger" id="incidents-count">0</div>
+          </div>
+        </div>
+
+        <!-- Zone Selector -->
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-muted"
+            >MONITOR ZONE</label
+          >
+          <select id="zone-select" class="form-select custom-select">
+            <option value="all">City-Wide</option>
+            <option value="downtown">Downtown</option>
+            <option value="north">North District</option>
+            <option value="south">South District</option>
+            <option value="east">East District</option>
+            <option value="west">West District</option>
+          </select>
+        </div>
+
+        <!-- Time Range -->
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-muted">TIME RANGE</label>
+          <select id="time-range" class="form-select custom-select">
+            <option value="live">Live (Now)</option>
+            <option value="1h">Last Hour</option>
+            <option value="3h">Last 3 Hours</option>
+            <option value="24h">Last 24 Hours</option>
+          </select>
+        </div>
+
+        <!-- Refresh Control -->
+        <div class="d-grid gap-2">
+          <button class="btn btn-primary custom-btn" id="refresh-btn">
+            <i class="fas fa-sync-alt me-2"></i>Refresh Now
+          </button>
+          <div class="form-check form-switch">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="auto-refresh"
+              checked
+            />
+            <label class="form-check-label small" for="auto-refresh">
+              Auto-refresh (5s)
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alerts Card -->
+      <div class="glass-card">
+        <div class="card-header-custom mb-3">
+          <h5>
+            <i class="fas fa-exclamation-triangle me-2 text-warning"></i>Active
+            Alerts
+          </h5>
+        </div>
+        <div
+          id="alerts-list"
+          class="custom-scrollbar"
+          style="max-height: 300px; overflow-y: auto"
+        >
+          <div class="text-center py-4 text-muted">
+            <i class="fas fa-check-circle fa-2x mb-2 opacity-50"></i>
+            <p class="small">No active alerts</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Panel: Map -->
+    <div class="col-lg-6">
+      <div
+        class="glass-card p-0 h-100 position-relative overflow-hidden"
+        style="min-height: 700px"
+      >
+        <!-- Map Controls Overlay -->
+        <div class="map-controls-overlay d-flex flex-column gap-2">
+          <!-- View Types -->
+          <div
+            class="btn-group shadow-sm bg-white bg-opacity-10 backdrop-blur rounded-pill p-1"
+          >
+            <button
+              class="btn btn-sm btn-light rounded-pill active"
+              id="btn-roadmap"
+              onclick="switchMapType('roadmap')"
+            >
+              Road
+            </button>
+            <button
+              class="btn btn-sm btn-light rounded-pill"
+              id="btn-satellite"
+              onclick="switchMapType('satellite')"
+            >
+              Satellite
+            </button>
+            <button
+              class="btn btn-sm btn-light rounded-pill"
+              id="btn-terrain"
+              onclick="switchMapType('terrain')"
+            >
+              Terrain
+            </button>
+            <button
+              class="btn btn-sm btn-light rounded-pill"
+              id="btn-hybrid"
+              onclick="switchMapType('hybrid')"
+            >
+              Hybrid
+            </button>
+          </div>
+
+          <!-- Layer Controls -->
+          <div class="d-flex gap-2">
+            <button
+              class="btn btn-sm btn-light shadow-sm rounded-pill active"
+              id="btn-traffic"
+              onclick="toggleTrafficLayer()"
+            >
+              <i class="fas fa-traffic-light me-1"></i>Traffic
+            </button>
+            <button
+              class="btn btn-sm btn-light shadow-sm rounded-pill"
+              id="btn-3d"
+              onclick="toggle3DView()"
+            >
+              <i class="fas fa-cube me-1"></i>3D
+            </button>
+            <button
+              class="btn btn-sm btn-light shadow-sm rounded-pill"
+              id="btn-heatmap"
+              onclick="toggleHeatmap()"
+            >
+              <i class="fas fa-fire me-1"></i>Heatmap
+            </button>
+          </div>
+        </div>
+
+        <!-- Map Container -->
+        <div id="map" class="h-100 w-100"></div>
+
+        <!-- Legend -->
+        <div
+          class="position-absolute bottom-0 start-0 m-3 glass-card p-2"
+          style="font-size: 0.85rem"
+        >
+          <div class="d-flex gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-1">
+              <div
+                style="
+                  width: 12px;
+                  height: 12px;
+                  background: #10b981;
+                  border-radius: 50%;
+                "
+              ></div>
+              <span>Low Traffic</span>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+              <div
+                style="
+                  width: 12px;
+                  height: 12px;
+                  background: #f59e0b;
+                  border-radius: 50%;
+                "
+              ></div>
+              <span>Medium</span>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+              <div
+                style="
+                  width: 12px;
+                  height: 12px;
+                  background: #ef4444;
+                  border-radius: 50%;
+                "
+              ></div>
+              <span>Heavy</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Analytics -->
+    <div class="col-lg-3">
+      <!-- Traffic Flow Chart -->
+      <div class="glass-card mb-4">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-chart-area me-2"></i>Traffic Flow</h5>
+        </div>
+        <canvas id="traffic-flow-chart" height="180"></canvas>
+      </div>
+
+      <!-- Speed Distribution -->
+      <div class="glass-card mb-4">
+        <div class="card-header-custom mb-3">
+          <h5><i class="fas fa-tachometer-alt me-2"></i>Speed Distribution</h5>
+        </div>
+        <div id="speed-distribution">
+          <div class="mb-2">
+            <div class="d-flex justify-content-between small mb-1">
+              <span>0-20 km/h</span>
+              <span id="speed-0-20">25%</span>
+            </div>
+            <div class="progress" style="height: 8px">
+              <div
+                class="progress-bar bg-danger"
+                role="progressbar"
+                style="width: 25%"
+              ></div>
+            </div>
+          </div>
+          <div class="mb-2">
+            <div class="d-flex justify-content-between small mb-1">
+              <span>20-40 km/h</span>
+              <span id="speed-20-40">35%</span>
+            </div>
+            <div class="progress" style="height: 8px">
+              <div
+                class="progress-bar bg-warning"
+                role="progressbar"
+                style="width: 35%"
+              ></div>
+            </div>
+          </div>
+          <div class="mb-2">
+            <div class="d-flex justify-content-between small mb-1">
+              <span>40-60 km/h</span>
+              <span id="speed-40-60">30%</span>
+            </div>
+            <div class="progress" style="height: 8px">
+              <div
+                class="progress-bar bg-success"
+                role="progressbar"
+                style="width: 30%"
+              ></div>
+            </div>
+          </div>
+          <div class="mb-2">
+            <div class="d-flex justify-content-between small mb-1">
+              <span>60+ km/h</span>
+              <span id="speed-60-plus">10%</span>
+            </div>
+            <div class="progress" style="height: 8px">
+              <div
+                class="progress-bar bg-info"
+                role="progressbar"
+                style="width: 10%"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hot Spots -->
+      <div class="glass-card">
+        <div class="card-header-custom mb-3">
+          <h5>
+            <i class="fas fa-map-marker-alt me-2 text-danger"></i>Congestion Hot
+            Spots
+          </h5>
+        </div>
+        <div
+          id="hotspots-list"
+          class="custom-scrollbar"
+          style="max-height: 200px; overflow-y: auto"
+        >
+          <!-- Will be populated by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .map-controls-overlay {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 1000;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .stat-item {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 0.75rem;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-value {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--text-primary);
+  }
+
+  .alert-item {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid var(--accent-danger);
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+  }
+
+  .alert-item-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: var(--accent-warning);
+  }
+
+  .hotspot-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .hotspot-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateX(5px);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--accent-primary);
+    border-radius: 10px;
+  }
+
+  .backdrop-blur {
+    backdrop-filter: blur(10px);
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+  let googleMap;
+  let trafficLayer = null;
+  let heatmap = null;
+  let is3D = false;
+  let markers = [];
+  let trafficFlowChart = null;
+
+  // Initialize map
+  function initializeMap() {
+    googleMap = new google.maps.Map(document.getElementById("map"), {
+      center: { lat: 12.9716, lng: 77.5946 },
+      zoom: 13,
+      mapId: "DEMO_MAP_ID",
+      mapTypeId: "roadmap",
+      heading: 0,
+      tilt: 0,
+      mapTypeControl: false,
+      fullscreenControl: true,
+      streetViewControl: false,
+      zoomControl: true,
+    });
+
+    // Enable traffic layer by default
+    trafficLayer = new google.maps.TrafficLayer();
+    trafficLayer.setMap(googleMap);
+
+    // Initialize chart
+    initTrafficFlowChart();
+
+    // Start live updates
+    loadTrafficData();
+
+    // Auto-refresh
+    setInterval(() => {
+      if (document.getElementById("auto-refresh").checked) {
+        loadTrafficData();
+      }
+    }, 5000);
+  }
+
+  function switchMapType(type) {
+    if (!googleMap) return;
+    googleMap.setMapTypeId(type);
+
+    document
+      .querySelectorAll(".btn-group .btn")
+      .forEach((btn) => btn.classList.remove("active"));
+    document.getElementById(`btn-${type}`).classList.add("active");
+  }
+
+  function toggleTrafficLayer() {
+    if (!trafficLayer) return;
+    const btn = document.getElementById("btn-traffic");
+
+    if (trafficLayer.getMap()) {
+      trafficLayer.setMap(null);
+      btn.classList.remove("active");
+    } else {
+      trafficLayer.setMap(googleMap);
+      btn.classList.add("active");
+    }
+  }
+
+  function toggle3DView() {
+    if (!googleMap) return;
+    const btn = document.getElementById("btn-3d");
+    is3D = !is3D;
+
+    if (is3D) {
+      googleMap.setTilt(45);
+      googleMap.setHeading(0);
+      btn.classList.add("active");
+    } else {
+      googleMap.setTilt(0);
+      googleMap.setHeading(0);
+      btn.classList.remove("active");
+    }
+  }
+
+  function toggleHeatmap() {
+    const btn = document.getElementById("btn-heatmap");
+    // Heatmap implementation would go here
+    btn.classList.toggle("active");
+    showNotification(
+      "Heatmap view " +
+        (btn.classList.contains("active") ? "enabled" : "disabled"),
+      "info"
+    );
+  }
+
+  function initTrafficFlowChart() {
+    const ctx = document.getElementById("traffic-flow-chart").getContext("2d");
+    trafficFlowChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: "Vehicles/min",
+            data: [],
+            borderColor: "#6366f1",
+            backgroundColor: "rgba(99, 102, 241, 0.1)",
+            tension: 0.4,
+            fill: true,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: "rgba(255, 255, 255, 0.1)" },
+          },
+          x: {
+            grid: { color: "rgba(255, 255, 255, 0.1)" },
+          },
+        },
+      },
+    });
+  }
+
+  async function loadTrafficData() {
+    try {
+      const response = await fetch("/api/traffic/live_status");
+      const data = await response.json();
+
+      // Update stats
+      document.getElementById("active-vehicles-count").textContent =
+        data.active_vehicles || Math.floor(Math.random() * 500 + 100);
+      document.getElementById("avg-speed").innerHTML = `${
+        data.avg_speed || Math.floor(Math.random() * 30 + 20)
+      } <span class="small">km/h</span>`;
+      document.getElementById("congestion-level").textContent =
+        data.congestion_level || "Moderate";
+      document.getElementById("incidents-count").textContent =
+        data.incidents || Math.floor(Math.random() * 5);
+
+      // Update congestion color
+      const congestionEl = document.getElementById("congestion-level");
+      congestionEl.className = "stat-value";
+      if (data.congestion_level === "Low") {
+        congestionEl.classList.add("text-success");
+      } else if (data.congestion_level === "High") {
+        congestionEl.classList.add("text-danger");
+      } else {
+        congestionEl.classList.add("text-warning");
+      }
+
+      // Update chart
+      updateTrafficChart();
+
+      // Update hotspots
+      updateHotspots(data.hotspots || []);
+
+      // Update alerts
+      updateAlerts(data.alerts || []);
+    } catch (error) {
+      console.error("Error loading traffic data:", error);
+      // Generate mock data
+      generateMockData();
+    }
+  }
+
+  function generateMockData() {
+    document.getElementById("active-vehicles-count").textContent = Math.floor(
+      Math.random() * 500 + 100
+    );
+    document.getElementById("avg-speed").innerHTML = `${Math.floor(
+      Math.random() * 30 + 20
+    )} <span class="small">km/h</span>`;
+
+    const levels = ["Low", "Moderate", "High"];
+    const level = levels[Math.floor(Math.random() * levels.length)];
+    const congestionEl = document.getElementById("congestion-level");
+    congestionEl.textContent = level;
+    congestionEl.className = "stat-value";
+    congestionEl.classList.add(
+      level === "Low"
+        ? "text-success"
+        : level === "High"
+        ? "text-danger"
+        : "text-warning"
+    );
+
+    document.getElementById("incidents-count").textContent = Math.floor(
+      Math.random() * 5
+    );
+
+    updateTrafficChart();
+    updateHotspots([
+      { name: "MG Road Junction", severity: "high", delay: "12 min" },
+      { name: "Silk Board", severity: "medium", delay: "8 min" },
+      { name: "Electronic City", severity: "medium", delay: "6 min" },
+    ]);
+  }
+
+  function updateTrafficChart() {
+    if (!trafficFlowChart) return;
+
+    const now = new Date();
+    const timeLabel =
+      now.getHours() + ":" + String(now.getMinutes()).padStart(2, "0");
+
+    trafficFlowChart.data.labels.push(timeLabel);
+    trafficFlowChart.data.datasets[0].data.push(
+      Math.floor(Math.random() * 200 + 50)
+    );
+
+    // Keep only last 10 data points
+    if (trafficFlowChart.data.labels.length > 10) {
+      trafficFlowChart.data.labels.shift();
+      trafficFlowChart.data.datasets[0].data.shift();
+    }
+
+    trafficFlowChart.update();
+  }
+
+  function updateHotspots(hotspots) {
+    const container = document.getElementById("hotspots-list");
+    if (!hotspots || hotspots.length === 0) {
+      // Use mock data
+      hotspots = [
+        { name: "MG Road Junction", severity: "high", delay: "12 min" },
+        { name: "Silk Board", severity: "medium", delay: "8 min" },
+        { name: "Electronic City", severity: "medium", delay: "6 min" },
+        { name: "Whitefield Main Road", severity: "low", delay: "3 min" },
+      ];
+    }
+
+    container.innerHTML = hotspots
+      .map(
+        (spot) => `
+      <div class="hotspot-item" onclick="focusOnLocation('${spot.name}')">
+        <div>
+          <div class="fw-bold small">${spot.name}</div>
+          <div class="text-muted" style="font-size: 0.75rem;">+${
+            spot.delay
+          } delay</div>
+        </div>
+        <span class="badge ${
+          spot.severity === "high"
+            ? "badge-danger"
+            : spot.severity === "medium"
+            ? "badge-warning"
+            : "badge-success"
+        }">${spot.severity.toUpperCase()}</span>
+      </div>
+    `
+      )
+      .join("");
+  }
+
+  function updateAlerts(alerts) {
+    const container = document.getElementById("alerts-list");
+    if (!alerts || alerts.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-4 text-muted">
+          <i class="fas fa-check-circle fa-2x mb-2 opacity-50"></i>
+          <p class="small">No active alerts</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = alerts
+      .map(
+        (alert) => `
+      <div class="alert-item ${
+        alert.type === "warning" ? "alert-item-warning" : ""
+      }">
+        <div class="small fw-bold">${alert.title}</div>
+        <div class="text-muted" style="font-size: 0.75rem;">${
+          alert.message
+        }</div>
+        <div class="text-muted" style="font-size: 0.7rem; margin-top: 0.25rem;">${
+          alert.time
+        }</div>
+      </div>
+    `
+      )
+      .join("");
+  }
+
+  function focusOnLocation(name) {
+    showNotification(`Focusing on ${name}`, "info");
+    // In a real implementation, this would pan to the location
+  }
+
+  document
+    .getElementById("refresh-btn")
+    .addEventListener("click", loadTrafficData);
+
+  window.addEventListener("load", initializeMap);
+
+  function showNotification(message, type) {
+    // Reuse notification system from base template
+    const toast = document.createElement("div");
+    toast.className = `alert alert-${type} position-fixed top-0 end-0 m-3`;
+    toast.style.zIndex = "9999";
+    toast.innerHTML = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.animation = "slideOutRight 0.3s ease-out forwards";
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+</script>
+
+<script
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDQd8Alart7JSkAPGYJMNo-dgerTQ4v-W4&callback=initializeMap&libraries=visualization&loading=async"
+  async
+  defer
+></script>
+{% endblock %}

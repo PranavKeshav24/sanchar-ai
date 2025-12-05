@@ -294,13 +294,9 @@ async function initCesiumMap(elementId, lat, lng, zoom = 12, apiKey = null) {
     // Clear container
     container.innerHTML = "";
 
-    // Use Cesium Ion default access token (free tier - no signup required for basic usage)
-    // For production, get your own free token at https://cesium.com/ion/tokens
-    // Cesium.Ion.defaultAccessToken = '...'; // Removed potentially invalid token
-
-    // Create the Cesium Viewer with high-quality terrain
+    // Use FREE OpenStreetMap imagery - NO authentication required!
     cesiumViewer = new Cesium.Viewer(elementId, {
-      baseLayerPicker: false,
+      baseLayerPicker: false, // Disable to avoid Ion dependency
       geocoder: false,
       homeButton: true,
       sceneModePicker: true,
@@ -311,22 +307,21 @@ async function initCesiumMap(elementId, lat, lng, zoom = 12, apiKey = null) {
       vrButton: false,
       selectionIndicator: true,
       infoBox: true,
-      shadows: false, // Disabled for performance
+      shadows: true,
       sceneMode: Cesium.SceneMode.SCENE3D,
-      // Use ESRI World Imagery (free, high-quality satellite imagery)
-      imageryProvider: new Cesium.ArcGisMapServerImageryProvider({
-        url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
-        enablePickFeatures: false,
+      // Use OpenStreetMap imagery (completely free, no authentication)
+      imageryProvider: new Cesium.OpenStreetMapImageryProvider({
+        url: "https://a.tile.openstreetmap.org/",
       }),
-      // Use default terrain (ellipsoid) initially to ensure loading, then upgrade if possible
-      terrainProvider: undefined,
+      // Use basic ellipsoid terrain (no authentication needed)
+      terrainProvider: new Cesium.EllipsoidTerrainProvider(),
     });
 
     // Hide default credits container (we'll add attribution elsewhere if needed)
     cesiumViewer.cesiumWidget.creditContainer.style.display = "none";
 
-    // Enable realistic rendering effects (but keep performance in mind)
-    cesiumViewer.scene.globe.enableLighting = false; // Disabled to prevent "laggy" behavior and dark globe
+    // Enable realistic rendering for Google Earth-like experience
+    cesiumViewer.scene.globe.enableLighting = true; // IMPORTANT: Enables sun lighting
     cesiumViewer.scene.skyAtmosphere.show = true;
     cesiumViewer.scene.fog.enabled = true;
     cesiumViewer.scene.globe.showGroundAtmosphere = true;
@@ -334,42 +329,29 @@ async function initCesiumMap(elementId, lat, lng, zoom = 12, apiKey = null) {
     // Enable depth testing for better 3D effect
     cesiumViewer.scene.globe.depthTestAgainstTerrain = true;
 
-    // Set time to noon to ensure good lighting
-    const noon = Cesium.JulianDate.fromDate(new Date(2023, 5, 1, 12, 0, 0)); // June 1st at noon
-    cesiumViewer.clock.currentTime = noon;
+    // Set high quality rendering
+    cesiumViewer.scene.highDynamicRange = true;
+    cesiumViewer.scene.requestRenderMode = false; // Always render for smooth experience
+
+    // Set time to current time for realistic sun position
+    const currentTime = Cesium.JulianDate.now();
+    cesiumViewer.clock.currentTime = currentTime;
     cesiumViewer.clock.shouldAnimate = false;
 
     // Store globally
     window.cesiumViewer = cesiumViewer;
     currentMapType = "cesium";
 
-    // Fly to initial location IMMEDIATELY (don't wait for terrain)
+    // Fly to initial location IMMEDIATELY
     flyToLocation(lat, lng, zoom);
 
-    // Try to load high-quality terrain asynchronously
+    // Add OSM 3D Buildings for city details
     try {
-      const terrain = await Cesium.createWorldTerrainAsync({
-        requestWaterMask: false, // Disabled for performance
-        requestVertexNormals: false, // Disabled for performance
-      });
-      if (cesiumViewer) {
-        cesiumViewer.terrainProvider = terrain;
-      }
-    } catch (e) {
-      console.warn(
-        "Could not load World Terrain, falling back to ellipsoid:",
-        e
-      );
-    }
-
-    // Add OSM 3D Buildings (free worldwide building data)
-    try {
-      console.log("Loading OSM 3D Buildings...");
       const osmBuildings = await Cesium.createOsmBuildingsAsync();
       if (cesiumViewer) {
         cesiumViewer.scene.primitives.add(osmBuildings);
+        console.log("✅ 3D Buildings loaded successfully");
       }
-      console.log("OSM 3D Buildings loaded successfully");
     } catch (buildingError) {
       console.warn("Could not load OSM Buildings:", buildingError);
       // Continue without buildings - not critical
@@ -432,9 +414,8 @@ function initMap(elementId, lat, lng, zoom = 12) {
 function updateCesiumTheme(theme) {
   if (!cesiumViewer) return;
 
-  // Always keep lighting disabled for now to ensure visibility and performance
-  // We can re-enable it later if needed, but for "Blue Sphere" debugging, we want flat lighting
-  cesiumViewer.scene.globe.enableLighting = false;
+  // Keep lighting enabled for realistic globe (not a blue sphere!)
+  cesiumViewer.scene.globe.enableLighting = true;
 
   if (theme === "dark") {
     // Dark theme - night mode

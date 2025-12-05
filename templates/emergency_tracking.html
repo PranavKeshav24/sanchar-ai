@@ -310,8 +310,8 @@
 
     googleMap = new google.maps.Map(document.getElementById("map"), {
       center: { lat: 12.9716, lng: 77.5946 },
-      zoom: 18,
-      mapId: "DEMO_MAP_ID", // Enable Vector Map features
+      zoom: 15,
+      mapId: "d3c6c3e3f8a3c3c3", // Required for 3D features
       mapTypeId: "roadmap",
       heading: 0,
       tilt: 0,
@@ -319,26 +319,7 @@
       fullscreenControl: true,
       streetViewControl: true,
       zoomControl: true,
-      styles: [
-        { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-        { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-        { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-        {
-          featureType: "road",
-          elementType: "geometry",
-          stylers: [{ color: "#38414e" }],
-        },
-        {
-          featureType: "road",
-          elementType: "geometry.stroke",
-          stylers: [{ color: "#212a37" }],
-        },
-        {
-          featureType: "road",
-          elementType: "labels.text.fill",
-          stylers: [{ color: "#9ca5b3" }],
-        },
-      ],
+      rotateControl: true,
     });
 
     trafficLayer = new google.maps.TrafficLayer();
@@ -631,6 +612,13 @@
 
           marker.addListener("click", () => selectVehicle(vehicle.id));
           markers[vehicle.id] = marker;
+
+          // Auto-fit bounds to show all markers
+          const bounds = new google.maps.LatLngBounds();
+          Object.values(markers).forEach((m) => bounds.extend(m.getPosition()));
+          if (Object.keys(markers).length > 0) {
+            googleMap.fitBounds(bounds);
+          }
         }
       }
     });
@@ -703,13 +691,79 @@
                     }')">
                         <i class="fas fa-traffic-light me-2"></i>Request Signal Priority
                     </button>
+                    <button class="btn btn-outline-success btn-sm text-start" onclick="simulateGPSTracking('${
+                      vehicle.id
+                    }')">
+                        <i class="fas fa-satellite-dish me-2"></i>Simulate GPS Tracking
+                    </button>
                 </div>
                 <div id="ai-results-${vehicle.id}" class="mt-3 small"></div>
             </div>
         `;
   }
 
-  function displayRoute(vehicle) {
+  let gpsSimulationIntervals = {};
+
+  function simulateGPSTracking(vehicleId) {
+    const vehicle = activeVehicles.find((v) => v.id === vehicleId);
+    if (!vehicle || !vehicle.route?.route?.polyline) {
+      showNotification("Cannot simulate GPS - no route available", "danger");
+      return;
+    }
+
+    // Stop any existing simulation for this vehicle
+    if (gpsSimulationIntervals[vehicleId]) {
+      clearInterval(gpsSimulationIntervals[vehicleId]);
+      delete gpsSimulationIntervals[vehicleId];
+      showNotification(`GPS tracking stopped for ${vehicleId}`, "info");
+      return;
+    }
+
+    const polyline = vehicle.route.route.polyline;
+    let currentIndex = 0;
+
+    showNotification(`GPS tracking started for ${vehicleId}`, "success");
+
+    // Simulate movement along the route
+    gpsSimulationIntervals[vehicleId] = setInterval(() => {
+      if (currentIndex >= polyline.length - 1) {
+        clearInterval(gpsSimulationIntervals[vehicleId]);
+        delete gpsSimulationIntervals[vehicleId];
+        showNotification(`${vehicleId} reached destination`, "success");
+        return;
+      }
+
+      currentIndex++;
+      const newPos = polyline[currentIndex];
+
+      // Update marker position
+      if (markers[vehicleId]) {
+        markers[vehicleId].setPosition({ lat: newPos.lat, lng: newPos.lng });
+
+        // Pan map to follow vehicle
+        if (selectedVehicle === vehicleId) {
+          googleMap.panTo({ lat: newPos.lat, lng: newPos.lng });
+        }
+      }
+
+      // Update ETA
+      const remainingPoints = polyline.length - currentIndex;
+      const totalPoints = polyline.length;
+      const progress = currentIndex / totalPoints;
+
+      if (vehicle.eta) {
+        const originalEta = vehicle.eta.eta_minutes;
+        vehicle.eta.eta_minutes = originalEta * (1 - progress);
+
+        // Update UI if this vehicle is selected
+        if (selectedVehicle === vehicleId) {
+          showVehicleDetails(vehicle);
+        }
+      }
+    }, 1000); // Update every second
+  }
+
+  function showVehicleDetails(vehicle) {
     if (!googleMap || !vehicle.route?.route?.polyline) return;
 
     // Clear existing route for this vehicle if any
@@ -857,10 +911,38 @@
 
   window.addEventListener("load", initializeMap);
   setInterval(loadActiveVehicles, 5000);
+
+  function showNotification(message, type) {
+    const alertClass =
+      type === "success"
+        ? "alert-success"
+        : type === "danger"
+        ? "alert-error"
+        : type === "warning"
+        ? "alert-warning"
+        : "alert-info";
+
+    const toast = document.createElement("div");
+    toast.className = `alert ${alertClass} position-fixed`;
+    toast.style.cssText =
+      "top: 20px; right: 20px; z-index: 9999; min-width: 300px; animation: slideInRight 0.3s ease-out;";
+    toast.innerHTML = `
+      <div class="d-flex align-items-center justify-content-between">
+        <span>${message}</span>
+        <button type="button" class="btn-close ms-3" onclick="this.parentElement.parentElement.remove()"></button>
+      </div>
+    `;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.animation = "slideOutRight 0.3s ease-out forwards";
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
 </script>
 
 <script
-  src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&callback=initializeMap&loading=async"
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDQd8Alart7JSkAPGYJMNo-dgerTQ4v-W4&callback=initializeMap&loading=async"
   async
   defer
 ></script>

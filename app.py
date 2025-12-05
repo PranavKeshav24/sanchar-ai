@@ -1279,6 +1279,35 @@ def generate_demo_data():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/live_traffic_dashboard')
+def live_traffic_dashboard():
+    """Live traffic monitoring dashboard"""
+    if 'user_id' not in session:
+        flash('Please log in to access this page', 'error')
+        return redirect(url_for('login'))
+    return render_template('live_traffic_dashboard.html')
+
+@app.route('/api/traffic/live_status')
+def get_live_traffic_status():
+    """Get live traffic status for dashboard"""
+    import random
+    
+    # Generate mock traffic data
+    congestion_levels = ['Low', 'Moderate', 'High']
+    
+    return jsonify({
+        'active_vehicles': random.randint(100, 600),
+        'avg_speed': random.randint(20, 50),
+        'congestion_level': random.choice(congestion_levels),
+        'incidents': random.randint(0, 5),
+        'hotspots': [
+            {'name': 'MG Road Junction', 'severity': 'high', 'delay': '12 min'},
+            {'name': 'Silk Board', 'severity': 'medium', 'delay': '8 min'},
+            {'name': 'Electronic City', 'severity': 'medium', 'delay': '6 min'}
+        ],
+        'alerts': []
+    })
+
 @app.route('/logout')
 def logout():
     session.clear()
