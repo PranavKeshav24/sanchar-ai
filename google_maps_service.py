@@ -50,7 +50,7 @@ class GoogleMapsService:
     """Google Maps API integration for geocoding and routing"""
     
     def __init__(self, api_key: str):
-        self.api_key = "AIzaSyCllw4RszflriLOjjNosp7KM9FNwY08jlc"
+        self.api_key = "your_api_key"
         self.base_url = "https://maps.googleapis.com/maps/api"
     
     def geocode_address(self, address: str) -> Optional[Dict]:
