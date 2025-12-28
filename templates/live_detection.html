@@ -44,9 +44,49 @@
               width: 100%;
               height: 100%;
               object-fit: contain;
+              background: #222;
             "
             alt="Live Camera Feed"
+            onerror="showCameraError('Camera feed unavailable. Please check permissions or connection.')"
           />
+          <div
+            id="loadingSpinner"
+            style="
+              display: none;
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              z-index: 10;
+            "
+          >
+            <div class="spinner-border text-info" role="status">
+              <span class="sr-only">Loading...</span>
+            </div>
+          </div>
+          <div
+            id="errorOverlay"
+            style="
+              display: none;
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(0, 0, 0, 0.7);
+              color: #fff;
+              z-index: 20;
+              align-items: center;
+              justify-content: center;
+              text-align: center;
+              font-size: 1.2rem;
+              padding-top: 30%;
+            "
+          >
+            <i class="fas fa-exclamation-triangle" style="font-size: 2rem"></i
+            ><br />
+            <span id="errorOverlayMsg">Camera error</span>
+          </div>
 
           <!-- Overlay for active status -->
           <div
@@ -236,57 +276,95 @@
     currentDetectionType = type;
     isDetectionActive = true;
 
-    // Update UI
-    document.getElementById("status").textContent = "Active";
-    document.getElementById("status").className = "badge badge-success";
-    document.getElementById("status").style.background = ""; // Reset inline style
-    document.getElementById("status").style.color = "";
-
-    document.getElementById("currentType").textContent =
-      type.charAt(0).toUpperCase() + type.slice(1) + " Detection";
-    document.getElementById("currentType").style.color =
-      "var(--accent-success)";
-    document.getElementById("currentType").style.fontWeight = "bold";
-
-    // Show video feed
-    document.getElementById("videoPlaceholder").style.display = "none";
-    document.getElementById("videoFeed").style.display = "block";
-    document.getElementById("activeOverlay").style.display = "block";
-    document.getElementById("videoFeed").src =
-      "{{ url_for('video_feed', detection_type='') }}" + type;
+    // Update UI immediately
+    document.getElementById("status").textContent = "Starting...";
+    document.getElementById("status").className = "badge badge-warning";
+    document.getElementById("currentType").textContent = "Initializing...";
 
     // Update buttons
     document.getElementById("accidentBtn").style.display = "none";
     document.getElementById("potholeBtn").style.display = "none";
     document.getElementById("stopBtn").style.display = "flex";
 
-    // Notify server
+    // FIRST: Notify server to start detection
+    document.getElementById("loadingSpinner").style.display = "block";
+    document.getElementById("errorOverlay").style.display = "none";
     fetch(`/start_live_detection/${type}`)
       .then((response) => response.json())
       .then((data) => {
         console.log("Detection started:", data);
-        showNotification(
-          `${
-            type.charAt(0).toUpperCase() + type.slice(1)
-          } detection started successfully!`,
-          "success"
-        );
+        setTimeout(() => {
+          document.getElementById("videoPlaceholder").style.display = "none";
+          document.getElementById("videoFeed").style.display = "block";
+          document.getElementById("activeOverlay").style.display = "block";
+          document.getElementById("loadingSpinner").style.display = "none";
+          // Set video source with cache buster to force reload
+          const timestamp = new Date().getTime();
+          document.getElementById("videoFeed").src =
+            "/video_feed/" + type + "?t=" + timestamp;
+          // Update status to active
+          document.getElementById("status").textContent = "Active";
+          document.getElementById("status").className = "badge badge-success";
+          document.getElementById("status").style.background = "";
+          document.getElementById("status").style.color = "";
+          document.getElementById("currentType").textContent =
+            type.charAt(0).toUpperCase() + type.slice(1) + " Detection";
+          document.getElementById("currentType").style.color =
+            "var(--accent-success)";
+          document.getElementById("currentType").style.fontWeight = "bold";
+          showNotification(
+            `${
+              type.charAt(0).toUpperCase() + type.slice(1)
+            } detection started successfully!`,
+            "success"
+          );
+        }, 2000);
       })
       .catch((error) => {
+        document.getElementById("loadingSpinner").style.display = "none";
+        document.getElementById("errorOverlay").style.display = "flex";
+        document.getElementById("errorOverlayMsg").textContent =
+          "Failed to start detection. Please check camera connection and permissions.";
         console.error("Error starting detection:", error);
+        isDetectionActive = false;
+        document.getElementById("accidentBtn").style.display = "flex";
+        document.getElementById("potholeBtn").style.display = "flex";
+        document.getElementById("stopBtn").style.display = "none";
         showNotification(
           "Error starting detection. Please check console.",
           "error"
         );
       });
+    // Show error overlay if camera feed fails
+    function showCameraError(msg) {
+      document.getElementById("loadingSpinner").style.display = "none";
+      document.getElementById("errorOverlay").style.display = "flex";
+      document.getElementById("errorOverlayMsg").textContent =
+        msg || "Camera feed unavailable.";
+      document.getElementById("videoFeed").style.display = "none";
+      document.getElementById("activeOverlay").style.display = "none";
+    }
   }
 
   function stopDetection() {
     if (!isDetectionActive) return;
 
+    // First notify server to stop
+    fetch("/stop_live_detection")
+      .then((response) => response.json())
+      .then((data) => {
+        console.log("Detection stopped:", data);
+        showNotification("Detection stopped successfully!", "info");
+      })
+      .catch((error) => {
+        console.error("Error stopping detection:", error);
+        showNotification("Error stopping detection.", "warning");
+      });
+
+    // Then update UI immediately
     isDetectionActive = false;
 
-    // Update UI
+    // Update status
     document.getElementById("status").textContent = "Inactive";
     document.getElementById("status").className = "badge badge-secondary";
     document.getElementById("status").style.background =
@@ -298,28 +376,47 @@
       "var(--text-secondary)";
     document.getElementById("currentType").style.fontWeight = "normal";
 
-    // Hide video feed
+    // Hide video feed and clear source
     document.getElementById("videoFeed").style.display = "none";
-    document.getElementById("videoFeed").src = "";
     document.getElementById("activeOverlay").style.display = "none";
     document.getElementById("videoPlaceholder").style.display = "block";
+
+    // Clear video source to stop the stream
+    document.getElementById("videoFeed").src = "";
 
     // Update buttons
     document.getElementById("accidentBtn").style.display = "flex";
     document.getElementById("potholeBtn").style.display = "flex";
     document.getElementById("stopBtn").style.display = "none";
+  }
 
-    // Notify server
-    fetch("/stop_live_detection")
-      .then((response) => response.json())
-      .then((data) => {
-        console.log("Detection stopped:", data);
-        showNotification("Detection stopped successfully!", "info");
-      })
-      .catch((error) => {
-        console.error("Error stopping detection:", error);
-        showNotification("Error stopping detection.", "warning");
-      });
+  // Show notification to user
+  function showNotification(message, type) {
+    const alertClass =
+      type === "success"
+        ? "alert-success"
+        : type === "error" || type === "danger"
+        ? "alert-danger"
+        : type === "warning"
+        ? "alert-warning"
+        : "alert-info";
+
+    const toast = document.createElement("div");
+    toast.className = `alert ${alertClass} position-fixed`;
+    toast.style.cssText =
+      "top: 20px; right: 20px; z-index: 9999; min-width: 300px; animation: slideIn 0.3s ease-out;";
+    toast.innerHTML = `
+      <div class="d-flex align-items-center justify-content-between">
+        <span>${message}</span>
+        <button type="button" class="btn-close" onclick="this.parentElement.parentElement.remove()"></button>
+      </div>
+    `;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.animation = "slideOut 0.3s ease-out";
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
   }
 
   // Clean up when leaving page

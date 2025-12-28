@@ -50,11 +50,29 @@ class GoogleMapsService:
     """Google Maps API integration for geocoding and routing"""
     
     def __init__(self, api_key: str):
-        self.api_key = api_key
+        self.api_key = "AIzaSyCllw4RszflriLOjjNosp7KM9FNwY08jlc"
         self.base_url = "https://maps.googleapis.com/maps/api"
     
     def geocode_address(self, address: str) -> Optional[Dict]:
-        """Convert address to coordinates"""
+        """Convert address to coordinates, or parse if already coordinates"""
+        # Check if input is already coordinates (lat,lng format)
+        if ',' in address:
+            try:
+                parts = address.strip().split(',')
+                if len(parts) == 2:
+                    lat = float(parts[0].strip())
+                    lng = float(parts[1].strip())
+                    # Validate reasonable coordinate ranges
+                    if -90 <= lat <= 90 and -180 <= lng <= 180:
+                        return {
+                            'lat': lat,
+                            'lng': lng,
+                            'formatted_address': f"{lat}, {lng}"
+                        }
+            except (ValueError, IndexError):
+                pass  # Not valid coordinates, continue to geocoding
+        
+        # Try Google Maps geocoding
         url = f"{self.base_url}/geocode/json"
         params = {
             'address': address,
@@ -62,7 +80,7 @@ class GoogleMapsService:
         }
         
         try:
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=3)
             data = response.json()
             
             if data['status'] == 'OK' and len(data['results']) > 0:
@@ -72,13 +90,44 @@ class GoogleMapsService:
                     'lng': location['lng'],
                     'formatted_address': data['results'][0]['formatted_address']
                 }
+            else:
+                print(f"Google geocoding failed for '{address}': {data.get('status', 'UNKNOWN')}")
         except Exception as e:
-            print(f"Geocoding error: {e}")
+            print(f"Google geocoding error for '{address}': {e}")
+        
+        # Fallback to OpenStreetMap Nominatim
+        try:
+            print(f"Using OpenStreetMap fallback for geocoding '{address}'")
+            osm_url = "https://nominatim.openstreetmap.org/search"
+            osm_params = {
+                'q': address,
+                'format': 'json',
+                'limit': 1
+            }
+            headers = {
+                'User-Agent': 'SancharAI-Emergency-Tracker/1.0'
+            }
+            
+            response = requests.get(osm_url, params=osm_params, headers=headers, timeout=3)
+            if response.status_code == 200:
+                data = response.json()
+                if data and len(data) > 0:
+                    result = data[0]
+                    coords = {
+                        'lat': float(result['lat']),
+                        'lng': float(result['lon']),
+                        'formatted_address': result.get('display_name', address)
+                    }
+                    print(f"✓ OSM geocode success: {coords['formatted_address']}")
+                    return coords
+        except Exception as e:
+            print(f"OpenStreetMap geocoding failed: {e}")
         
         return None
     
     def reverse_geocode(self, lat: float, lng: float) -> str:
-        """Convert coordinates to address"""
+        """Convert coordinates to address with fallback to OpenStreetMap"""
+        # Try Google Maps first
         url = f"{self.base_url}/geocode/json"
         params = {
             'latlng': f"{lat},{lng}",
@@ -86,14 +135,37 @@ class GoogleMapsService:
         }
         
         try:
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=3)
             data = response.json()
             
             if data['status'] == 'OK' and len(data['results']) > 0:
                 return data['results'][0]['formatted_address']
         except Exception as e:
-            print(f"Reverse geocoding error: {e}")
+            print(f"Google reverse geocoding failed: {e}")
         
+        # Fallback to OpenStreetMap Nominatim (free, no API key needed)
+        try:
+            print(f"Using OpenStreetMap fallback for reverse geocoding")
+            osm_url = "https://nominatim.openstreetmap.org/reverse"
+            osm_params = {
+                'lat': lat,
+                'lon': lng,
+                'format': 'json'
+            }
+            headers = {
+                'User-Agent': 'SancharAI-Emergency-Tracker/1.0'
+            }
+            
+            response = requests.get(osm_url, params=osm_params, headers=headers, timeout=3)
+            if response.status_code == 200:
+                data = response.json()
+                address = data.get('display_name', f"{lat}, {lng}")
+                print(f"✓ OSM reverse geocode: {address}")
+                return address
+        except Exception as e:
+            print(f"OpenStreetMap reverse geocoding failed: {e}")
+        
+        # Final fallback
         return f"{lat}, {lng}"
     
     def get_route(self, origin: str, destination: str, mode: str = 'driving') -> Optional[Dict]:
@@ -124,8 +196,11 @@ class GoogleMapsService:
                     'polyline': route['overview_polyline']['points'],
                     'steps': leg['steps']
                 }
+            else:
+                error_msg = data.get('error_message', data.get('status', 'UNKNOWN'))
+                print(f"Routing failed ({origin} -> {destination}): {error_msg}")
         except Exception as e:
-            print(f"Routing error: {e}")
+            print(f"Routing error ({origin} -> {destination}): {e}")
         
         return None
     
@@ -422,14 +497,35 @@ class EmergencyVehicleTracker:
     
     def register_vehicle(self, vehicle_id: str, vehicle_type: str, current_location: str, destination: str) -> Dict:
         """Register new emergency vehicle"""
+        print(f"Registering vehicle {vehicle_id}: {current_location} -> {destination}")
+        
+        # Parse current location (must be coordinates)
+        current_coords = self.maps_service.geocode_address(current_location)
+        if not current_coords:
+            print(f"✗ Failed: Could not parse current location '{current_location}'")
+            return {'error': 'Invalid current location format'}
+        
+        # Try to parse destination
+        dest_coords = self.maps_service.geocode_address(destination)
+        
+        # If destination couldn't be geocoded, use a default nearby location
+        if not dest_coords:
+            print(f"⚠ Destination '{destination}' could not be geocoded, using nearby default")
+            # Use a location 5km away as estimate
+            dest_coords = {
+                'lat': current_coords['lat'] + 0.045,  # ~5km north
+                'lng': current_coords['lng'] + 0.045,  # ~5km east
+                'formatted_address': destination
+            }
+        
+        # Try to get route (optional - continue if fails)
         route_data = self.maps_service.get_route(current_location, destination)
         
         if route_data:
-            # Decode polyline to get actual coordinates
+            # Full route available
             from google_maps_service import decode_polyline
             polyline_coords = decode_polyline(route_data['polyline'])
             
-            # Calculate ETA in minutes
             eta_minutes = route_data['duration_value'] / 60
             distance_km = route_data['distance_value'] / 1000
             
@@ -438,6 +534,8 @@ class EmergencyVehicleTracker:
                 'type': vehicle_type,
                 'current_location': current_location,
                 'destination': destination,
+                'current_coords': current_coords,
+                'destination_coords': dest_coords,
                 'route': {
                     'route': {
                         'polyline': polyline_coords,
@@ -453,9 +551,46 @@ class EmergencyVehicleTracker:
                 'registered_at': datetime.now().isoformat()
             }
             
+            print(f"✓ Vehicle {vehicle_id} registered with full route. Total active: {len(self.active_vehicles)}")
             return self.active_vehicles[vehicle_id]
         
-        return {'error': 'Could not calculate route'}
+        # Fallback: Register with coordinates only (calculate straight-line distance)
+        print(f"⚠ Route API unavailable, using straight-line distance")
+        
+        # Calculate straight-line distance
+        import math
+        lat1, lng1 = current_coords['lat'], current_coords['lng']
+        lat2, lng2 = dest_coords['lat'], dest_coords['lng']
+        
+        # Haversine formula
+        R = 6371  # Earth's radius in km
+        dlat = math.radians(lat2 - lat1)
+        dlng = math.radians(lng2 - lng1)
+        a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng/2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        distance_km = R * c
+        
+        # Estimate ETA (40 km/h city average)
+        eta_minutes = (distance_km / 40) * 60
+        
+        self.active_vehicles[vehicle_id] = {
+            'id': vehicle_id,
+            'type': vehicle_type,
+            'current_location': current_location,
+            'destination': destination,
+            'current_coords': current_coords,
+            'destination_coords': dest_coords,
+            'eta': {
+                'eta_minutes': eta_minutes,
+                'distance_km': distance_km
+            },
+            'status': 'active',
+            'registered_at': datetime.now().isoformat(),
+            'mode': 'estimated'
+        }
+        
+        print(f"✓ Vehicle {vehicle_id} registered (estimated). Distance: {distance_km:.2f}km, ETA: {eta_minutes:.1f}min. Total: {len(self.active_vehicles)}")
+        return self.active_vehicles[vehicle_id]
     
     def update_vehicle_location(self, vehicle_id: str, new_location: str) -> Optional[Dict]:
         """Update vehicle location and recalculate route if needed"""

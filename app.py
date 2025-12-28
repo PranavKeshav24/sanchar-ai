@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, Response
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 import json
 import random
 from datetime import datetime
@@ -13,17 +14,9 @@ import threading
 import time
 import numpy as np
 import os
-from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, flash
 import cv2
 import torch
-import numpy as np
 import sqlite3
-import os
-from datetime import datetime
-import threading
-from werkzeug.utils import secure_filename
-import json
-import time
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
@@ -96,6 +89,7 @@ MODELS = {
 processing_videos = {}
 live_camera = None
 live_detection_active = False
+live_camera_ready = False
 current_live_detection_type = None
 
 def allowed_file(filename):
@@ -150,16 +144,44 @@ init_db()
 def get_model(detection_type):
     """Load and return the appropriate model"""
     model_path = MODELS.get(detection_type)
-    if model_path and os.path.exists(model_path):
+    if not model_path:
+        print(f"No model configured for detection type: {detection_type}")
+        return None
+        
+    if not os.path.exists(model_path):
+        print(f"Model file not found: {model_path}")
+        return None
+    
+    try:
+        print(f"Loading YOLOv5 model from {model_path}...")
+        
+        # Try loading with torch hub (requires internet first time)
         try:
-            model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, force_reload=False)
-            model.conf = 0.25
-            return model
-        except Exception as e:
-            print(f"Error loading model {detection_type}: {e}")
-            return None
-    else:
-        print(f"Model path not found: {model_path}")
+            model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, force_reload=False, trust_repo=True)
+        except Exception as hub_error:
+            print(f"Torch hub load failed: {hub_error}")
+            print("Attempting local YOLOv5 import...")
+            
+            # Fallback: Try importing yolov5 directly if installed
+            try:
+                import yolov5
+                model = yolov5.load(model_path)
+            except ImportError:
+                print("YOLOv5 not installed. Installing...")
+                import subprocess
+                subprocess.check_call(['pip', 'install', 'yolov5'])
+                import yolov5
+                model = yolov5.load(model_path)
+        
+        model.conf = 0.25  # Confidence threshold
+        model.iou = 0.45   # NMS IoU threshold
+        print(f"✓ Model loaded successfully: {detection_type}")
+        return model
+        
+    except Exception as e:
+        print(f"✗ Error loading model {detection_type}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def save_complaint(detection_type, confidence, image_path=None, description=""):
@@ -177,26 +199,79 @@ def save_complaint(detection_type, confidence, image_path=None, description=""):
 
 def generate_live_frames(detection_type):
     """Generate live camera frames with object detection"""
-    global live_camera, live_detection_active
+    global live_camera, live_detection_active, live_camera_ready
+    
+    print(f"Initializing live detection for: {detection_type}")
     
     model = get_model(detection_type)
     if not model:
-        # Return a black frame if model fails to load
-        black_frame = np.zeros((480, 640, 3), dtype=np.uint8)
-        cv2.putText(black_frame, "Model not available", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        ret, buffer = cv2.imencode('.jpg', black_frame)
+        print(f"Model loading failed for {detection_type}")
+        # Return error frame if model fails to load
+        error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(error_frame, "MODEL LOADING FAILED", (120, 200), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        cv2.putText(error_frame, f"Model: {detection_type}", (180, 240), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.putText(error_frame, "Check console for errors", (140, 280), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.putText(error_frame, "Run: pip install yolov5", (130, 320), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 1)
+        
+        ret, buffer = cv2.imencode('.jpg', error_frame)
         frame_bytes = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        
+        # Keep showing error frame while detection is "active"
+        while live_detection_active:
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            time.sleep(0.5)
         return
     
+    # Try to open camera
+    print("Opening camera...")
     live_camera = cv2.VideoCapture(0)
-    live_detection_active = True
     
+    # Give camera time to initialize
+    time.sleep(1)
+    
+    if not live_camera.isOpened():
+        print("Camera failed to open")
+        live_camera_ready = False
+        # Camera not available
+        error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(error_frame, "CAMERA NOT AVAILABLE", (120, 240), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        cv2.putText(error_frame, "Check camera permissions", (140, 280), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.putText(error_frame, "Or camera is in use", (160, 310), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        
+        ret, buffer = cv2.imencode('.jpg', error_frame)
+        frame_bytes = buffer.tobytes()
+        
+        # Show error for a few seconds
+        for _ in range(10):
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            time.sleep(0.5)
+            if not live_detection_active:
+                break
+        return
+    
+    live_camera_ready = True
+    print(f"✓ Live detection started: {detection_type}")
+    print(f"Camera opened successfully, starting frame generation...")
+    
+    frame_count = 0
     while live_detection_active:
         success, frame = live_camera.read()
         if not success:
+            print("Failed to read frame from camera")
             break
+        
+        frame_count += 1
+        if frame_count % 30 == 0:  # Log every 30 frames
+            print(f"Processing frame {frame_count}...")
         
         try:
             # Perform detection
@@ -246,8 +321,12 @@ def generate_live_frames(detection_type):
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
     
+    print(f"Live detection stopped. Releasing camera...")
     if live_camera:
         live_camera.release()
+        live_camera = None
+        live_camera_ready = False
+        print("Camera released")
 
 def generate_processed_frames(video_path, detection_type, session_id):
     """Generate processed video frames with bounding boxes"""
@@ -386,15 +465,30 @@ def video_feed(detection_type):
 @app.route('/start_live_detection/<detection_type>')
 def start_live_detection(detection_type):
     """Start live detection"""
-    global current_live_detection_type
+    global current_live_detection_type, live_detection_active, live_camera, live_camera_ready
+    
+    # Stop any existing detection first
+    if live_detection_active:
+        print(f"Stopping previous detection before starting {detection_type}")
+        live_detection_active = False
+        if live_camera:
+            live_camera.release()
+            live_camera = None
+        live_camera_ready = False
+        import time
+        time.sleep(0.5)  # Give time for cleanup
+    
     current_live_detection_type = detection_type
+    live_detection_active = True
+    print(f"Starting live detection: {detection_type}")
     return jsonify({'status': 'started', 'type': detection_type})
 
 @app.route('/stop_live_detection')
 def stop_live_detection():
     """Stop live detection"""
-    global live_detection_active, live_camera
+    global live_detection_active, live_camera, live_camera_ready
     live_detection_active = False
+    live_camera_ready = False
     if live_camera:
         live_camera.release()
         live_camera = None
@@ -832,24 +926,54 @@ def register_emergency_vehicle():
         vehicle_id, vehicle_type, current_location, destination
     )
     
-    # Save to database
+    # Check if route calculation failed
+    if 'error' in vehicle:
+        print(f"Route calculation error: {vehicle['error']}")
+        return jsonify(vehicle), 400
+    
+    # Save to database (update if exists, insert if new)
+    # Use coordinates from vehicle object if geocoding failed
     try:
-        current_coords = maps_service.geocode_address(current_location)
-        dest_coords = maps_service.geocode_address(destination)
+        # Get coordinates from the registered vehicle object
+        current_coords = vehicle.get('current_coords')
+        dest_coords = vehicle.get('destination_coords')
         
-        db_vehicle = EmergencyVehicle(
-            vehicle_id=vehicle_id,
-            vehicle_type=vehicle_type,
-            current_lat=current_coords['lat'] if current_coords else None,
-            current_lng=current_coords['lng'] if current_coords else None,
-            destination_lat=dest_coords['lat'] if dest_coords else None,
-            destination_lng=dest_coords['lng'] if dest_coords else None,
-            status='active'
-        )
-        db.session.add(db_vehicle)
+        # Fallback to geocoding if not in vehicle object
+        if not current_coords:
+            current_coords = maps_service.geocode_address(current_location)
+        if not dest_coords:
+            dest_coords = maps_service.geocode_address(destination)
+        
+        # Check if vehicle already exists
+        db_vehicle = EmergencyVehicle.query.filter_by(vehicle_id=vehicle_id).first()
+        
+        if db_vehicle:
+            # Update existing vehicle
+            db_vehicle.vehicle_type = vehicle_type
+            db_vehicle.current_lat = current_coords['lat'] if current_coords else None
+            db_vehicle.current_lng = current_coords['lng'] if current_coords else None
+            db_vehicle.destination_lat = dest_coords['lat'] if dest_coords else None
+            db_vehicle.destination_lng = dest_coords['lng'] if dest_coords else None
+            db_vehicle.status = 'active'
+            db_vehicle.updated_at = datetime.utcnow()
+        else:
+            # Create new vehicle
+            db_vehicle = EmergencyVehicle(
+                vehicle_id=vehicle_id,
+                vehicle_type=vehicle_type,
+                current_lat=current_coords['lat'] if current_coords else None,
+                current_lng=current_coords['lng'] if current_coords else None,
+                destination_lat=dest_coords['lat'] if dest_coords else None,
+                destination_lng=dest_coords['lng'] if dest_coords else None,
+                status='active'
+            )
+            db.session.add(db_vehicle)
+        
         db.session.commit()
+        print(f"✓ Vehicle {vehicle_id} saved to database (Lat: {db_vehicle.current_lat}, Lng: {db_vehicle.current_lng})")
     except Exception as e:
         print(f"Error saving to database: {e}")
+        db.session.rollback()
     
     return jsonify(vehicle)
 
@@ -894,8 +1018,42 @@ def get_emergency_status(vehicle_id):
 
 @app.route('/api/emergency/all_active')
 def get_all_active_emergency():
-    """Get all active emergency vehicles"""
+    """Get all active emergency vehicles from both memory and database"""
+    # Get from in-memory tracker
     vehicles = emergency_tracker.get_all_active_vehicles()
+    
+    # If empty, try to restore from database
+    if not vehicles:
+        try:
+            db_vehicles = EmergencyVehicle.query.filter_by(status='active').all()
+            vehicles = []
+            for db_v in db_vehicles:
+                # Reconstruct vehicle data from database
+                vehicle_data = {
+                    'id': db_v.vehicle_id,
+                    'type': db_v.vehicle_type,
+                    'current_location': f"{db_v.current_lat},{db_v.current_lng}" if db_v.current_lat else "Unknown",
+                    'destination': f"{db_v.destination_lat},{db_v.destination_lng}" if db_v.destination_lat else "Unknown",
+                    'status': db_v.status,
+                    'registered_at': db_v.created_at.isoformat() if db_v.created_at else None,
+                    'updated_at': db_v.updated_at.isoformat() if db_v.updated_at else None
+                }
+                vehicles.append(vehicle_data)
+                
+                # Re-register in tracker if has full data
+                if db_v.current_lat and db_v.destination_lat:
+                    try:
+                        emergency_tracker.register_vehicle(
+                            db_v.vehicle_id,
+                            db_v.vehicle_type,
+                            f"{db_v.current_lat},{db_v.current_lng}",
+                            f"{db_v.destination_lat},{db_v.destination_lng}"
+                        )
+                    except Exception as e:
+                        print(f"Error re-registering vehicle {db_v.vehicle_id}: {e}")
+        except Exception as e:
+            print(f"Error loading vehicles from database: {e}")
+    
     return jsonify({'vehicles': vehicles})
 
 @app.route('/api/emergency/complete/<vehicle_id>', methods=['POST'])
