@@ -427,7 +427,7 @@
 <script>
   const DEFAULT_LAT = parseFloat("{{ default_lat }}");
   const DEFAULT_LNG = parseFloat("{{ default_lng }}");
-  const GOOGLE_MAPS_API_KEY = "your_api_key";
+  const GOOGLE_MAPS_API_KEY = "{{ api_key }}";
   let googleMap;
   let markers = [];
   let heatmapLayer = null;
@@ -439,9 +439,51 @@
   let reportLng = null;
   let reportModal = null;
   let isGlobeMode = false;
+  let mapInitialized = false;
   // cesiumViewer is declared in theme-manager.js globally
 
+  // Error handler for Google Maps API loading failure
+  function handleMapError() {
+    const mapContainer = document.getElementById("map");
+    if (mapContainer) {
+      mapContainer.innerHTML = `
+        <div class="d-flex flex-column align-items-center justify-content-center h-100 text-center p-4">
+          <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+          <h5 class="text-white mb-2">Map Loading Failed</h5>
+          <p class="text-muted small mb-3">
+            Google Maps API could not be loaded. Please ensure:<br>
+            1. Your API key is valid<br>
+            2. Maps JavaScript API is enabled in Google Cloud Console<br>
+            3. Places API is enabled (for nearby hospitals)<br>
+            4. Billing is enabled for your project
+          </p>
+          <a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com" 
+             target="_blank" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-external-link-alt me-1"></i>Enable Maps API
+          </a>
+        </div>
+      `;
+    }
+    console.error(
+      "Google Maps API failed to load. Please check your API key and enabled APIs."
+    );
+  }
+
+  // Check if Google Maps API is available
+  function checkGoogleMapsAPI() {
+    if (typeof google === "undefined" || typeof google.maps === "undefined") {
+      handleMapError();
+      return false;
+    }
+    return true;
+  }
+
   function initializeMap() {
+    // Check if Google Maps API is available
+    if (!checkGoogleMapsAPI()) {
+      return;
+    }
+
     try {
       const mapContainer = document.getElementById("map");
       // Don't clear if we are just re-initializing Google Maps
@@ -478,9 +520,12 @@
         loadAllDetections();
         loadTerrainRiskData();
       }
+
+      mapInitialized = true;
+      console.log("✓ Google Maps initialized successfully");
     } catch (error) {
       console.error("Error initializing map:", error);
-      showNotification("Failed to load map: " + error.message, "danger");
+      handleMapError();
     }
   }
 
@@ -1163,43 +1208,105 @@
   }
 
   async function findNearbyHospitals() {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      showNotification("Geolocation not supported by browser", "warning");
+      return;
+    }
 
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      try {
-        const response = await fetch("/api/nearby_hospitals", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            radius: 5000,
-          }),
-        });
-        const data = await response.json();
+    showNotification("Getting your location...", "info");
 
-        if (data.hospitals?.length > 0) {
-          data.hospitals.forEach((h) => {
-            new google.maps.Marker({
-              position: { lat: h.lat, lng: h.lng },
-              map: googleMap,
-              title: h.name,
-              icon: {
-                url: "http://maps.google.com/mapfiles/ms/icons/hospitals.png",
-              },
-            });
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          showNotification("Searching for nearby hospitals...", "info");
+          const response = await fetch("/api/nearby_hospitals", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              radius: 5000,
+            }),
           });
-          showNotification(
-            `Found ${data.hospitals.length} hospitals`,
-            "success"
-          );
-        } else {
-          showNotification("No hospitals found nearby", "info");
+          const data = await response.json();
+
+          if (data.error) {
+            showNotification("Error: " + data.error, "danger");
+            return;
+          }
+
+          if (data.hospitals?.length > 0) {
+            // Center map on user location
+            googleMap.panTo({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            });
+            googleMap.setZoom(14);
+
+            // Add user location marker
+            new google.maps.Marker({
+              position: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+              map: googleMap,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 10,
+                fillColor: "#4f46e5",
+                fillOpacity: 1,
+                strokeColor: "white",
+                strokeWeight: 3,
+              },
+              title: "Your Location",
+            });
+
+            // Add hospital markers
+            data.hospitals.forEach((h) => {
+              const hospitalMarker = new google.maps.Marker({
+                position: { lat: h.lat, lng: h.lng },
+                map: googleMap,
+                title: h.name,
+                icon: {
+                  url: "https://maps.google.com/mapfiles/kml/shapes/hospitals.png",
+                  scaledSize: new google.maps.Size(32, 32),
+                },
+              });
+
+              const infoWindow = new google.maps.InfoWindow({
+                content: `
+                  <div style="padding:8px;">
+                    <h6 class="mb-1 fw-bold">${h.name}</h6>
+                    <small class="text-muted">${
+                      h.address || "Hospital"
+                    }</small><br>
+                    ${h.rating ? `<small>Rating: ⭐ ${h.rating}</small>` : ""}
+                  </div>
+                `,
+              });
+
+              hospitalMarker.addListener("click", () =>
+                infoWindow.open(googleMap, hospitalMarker)
+              );
+            });
+
+            showNotification(
+              `Found ${data.hospitals.length} hospitals nearby`,
+              "success"
+            );
+          } else {
+            showNotification("No hospitals found within 5km radius", "info");
+          }
+        } catch (e) {
+          console.error("Hospital search error:", e);
+          showNotification("Failed to find hospitals: " + e.message, "danger");
         }
-      } catch (e) {
-        showNotification("Failed to find hospitals", "danger");
-      }
-    });
+      },
+      (error) => {
+        let msg = "Location access denied";
+        if (error.code === 2) msg = "Position unavailable";
+        if (error.code === 3) msg = "Location request timed out";
+        showNotification(msg + ". Please enable location services.", "warning");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   }
 
   function toggleTerrainHeatmap() {
@@ -1356,11 +1463,19 @@
   console.log("Map Dashboard Initialized");
   console.log("Cesium available:", typeof Cesium !== "undefined");
   console.log("MapUtils available:", typeof window.MapUtils !== "undefined");
+
+  // Fallback: If Google Maps API doesn't load within 10 seconds, show error
+  setTimeout(() => {
+    if (!mapInitialized && typeof google === "undefined") {
+      handleMapError();
+    }
+  }, 10000);
 </script>
 
 <script
-  src="https://maps.googleapis.com/maps/api/js?key=your_api_key&libraries=places,geometry,visualization&callback=initializeMap&loading=async"
+  src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&libraries=places,geometry,visualization&callback=initializeMap&loading=async"
   async
   defer
+  onerror="handleMapError()"
 ></script>
 {% endblock %}

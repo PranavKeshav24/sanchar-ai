@@ -1443,7 +1443,8 @@ def live_traffic_dashboard():
     if 'user_id' not in session:
         flash('Please log in to access this page', 'error')
         return redirect(url_for('login'))
-    return render_template('live_traffic_dashboard.html')
+    return render_template('live_traffic_dashboard.html',
+                         api_key=app.config.get('GOOGLE_MAPS_API_KEY'))
 
 @app.route('/api/traffic/live_status')
 def get_live_traffic_status():

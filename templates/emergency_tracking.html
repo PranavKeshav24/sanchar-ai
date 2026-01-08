@@ -302,28 +302,76 @@
   let routePolylines = {};
   let trafficLayer = null;
   let is3D = false;
+  let mapInitialized = false;
+
+  // Error handler for Google Maps API loading failure
+  function handleMapError() {
+    const mapContainer = document.getElementById("map");
+    if (mapContainer) {
+      mapContainer.innerHTML = `
+        <div class="d-flex flex-column align-items-center justify-content-center h-100 text-center p-4">
+          <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+          <h5 class="text-white mb-2">Map Loading Failed</h5>
+          <p class="text-muted small mb-3">
+            Google Maps API could not be loaded. Please ensure:<br>
+            1. Your API key is valid<br>
+            2. Maps JavaScript API is enabled in Google Cloud Console<br>
+            3. Billing is enabled for your project
+          </p>
+          <a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com"
+             target="_blank" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-external-link-alt me-1"></i>Enable Maps API
+          </a>
+        </div>
+      `;
+    }
+    console.error(
+      "Google Maps API failed to load. Please check your API key and enabled APIs."
+    );
+  }
+
+  // Check if Google Maps API is available
+  function checkGoogleMapsAPI() {
+    if (typeof google === "undefined" || typeof google.maps === "undefined") {
+      handleMapError();
+      return false;
+    }
+    return true;
+  }
 
   // Initialize map
   function initializeMap() {
     const mapContainer = document.getElementById("map");
     if (!mapContainer) return;
 
-    googleMap = new google.maps.Map(document.getElementById("map"), {
-      center: { lat: 12.9716, lng: 77.5946 },
-      zoom: 15,
-      mapId: "d3c6c3e3f8a3c3c3", // Required for 3D features
-      mapTypeId: "roadmap",
-      heading: 0,
-      tilt: 0,
-      mapTypeControl: false,
-      fullscreenControl: true,
-      streetViewControl: true,
-      zoomControl: true,
-      rotateControl: true,
-    });
+    // Check if Google Maps API is available
+    if (!checkGoogleMapsAPI()) {
+      return;
+    }
 
-    trafficLayer = new google.maps.TrafficLayer();
-    loadActiveVehicles();
+    try {
+      googleMap = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 12.9716, lng: 77.5946 },
+        zoom: 15,
+        mapId: "d3c6c3e3f8a3c3c3", // Required for 3D features
+        mapTypeId: "roadmap",
+        heading: 0,
+        tilt: 0,
+        mapTypeControl: false,
+        fullscreenControl: true,
+        streetViewControl: true,
+        zoomControl: true,
+        rotateControl: true,
+      });
+
+      trafficLayer = new google.maps.TrafficLayer();
+      mapInitialized = true;
+      loadActiveVehicles();
+      console.log("✓ Google Maps initialized successfully");
+    } catch (error) {
+      console.error("Error initializing Google Maps:", error);
+      handleMapError();
+    }
   }
 
   function switchMapType(type) {
@@ -579,6 +627,11 @@
           routePolylines[id].setMap(null);
           delete routePolylines[id];
         }
+        // Clean up destination markers
+        if (window.destMarkers && window.destMarkers[id]) {
+          window.destMarkers[id].setMap(null);
+          delete window.destMarkers[id];
+        }
       }
     }
 
@@ -590,27 +643,61 @@
           fire_truck: "#f97316",
           police: "#3b82f6",
         };
+        const typeIcons = {
+          ambulance: "🚑",
+          fire_truck: "🚒",
+          police: "🚓",
+        };
         const color = typeColors[vehicle.type] || "#10b981";
 
         // Create or update marker
         if (markers[vehicle.id]) {
           markers[vehicle.id].setPosition({ lat: pos.lat, lng: pos.lng });
         } else {
+          // Create SVG icon for emergency vehicle
+          const svgIcon = {
+            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="20" fill="${color}" stroke="white" stroke-width="3"/>
+                <text x="24" y="32" font-size="20" text-anchor="middle" fill="white">${
+                  typeIcons[vehicle.type] || "🚗"
+                }</text>
+              </svg>
+            `)}`,
+            scaledSize: new google.maps.Size(48, 48),
+            anchor: new google.maps.Point(24, 24),
+          };
+
           const marker = new google.maps.Marker({
             position: { lat: pos.lat, lng: pos.lng },
             map: googleMap,
             title: `${vehicle.id} (${vehicle.type})`,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 10,
-              fillColor: color,
-              fillOpacity: 1,
-              strokeColor: "white",
-              strokeWeight: 2,
-            },
+            icon: svgIcon,
+            animation: google.maps.Animation.DROP,
+            zIndex: 1000, // Ensure emergency vehicles are on top
           });
 
-          marker.addListener("click", () => selectVehicle(vehicle.id));
+          // Add info window with vehicle details
+          const infoWindow = new google.maps.InfoWindow({
+            content: `
+              <div style="padding:8px; min-width: 150px;">
+                <h6 class="mb-1 fw-bold">${vehicle.id}</h6>
+                <small class="text-muted">${vehicle.type
+                  .replace("_", " ")
+                  .toUpperCase()}</small><br>
+                <small>ETA: ${
+                  vehicle.eta
+                    ? Math.round(vehicle.eta.eta_minutes) + " min"
+                    : "Calculating..."
+                }</small>
+              </div>
+            `,
+          });
+
+          marker.addListener("click", () => {
+            infoWindow.open(googleMap, marker);
+            selectVehicle(vehicle.id);
+          });
           markers[vehicle.id] = marker;
 
           // Auto-fit bounds to show all markers
@@ -646,7 +733,7 @@
                   .replace("_", " ")
                   .toUpperCase()}</span>
             </div>
-            
+
             <div class="stat-grid">
                 <div class="stat-item">
                     <div class="stat-label">ETA</div>
@@ -763,7 +850,7 @@
     }, 1000); // Update every second
   }
 
-  function showVehicleDetails(vehicle) {
+  function displayRoute(vehicle) {
     if (!googleMap || !vehicle.route?.route?.polyline) return;
 
     // Clear existing route for this vehicle if any
@@ -780,6 +867,7 @@
       lng: p.lng,
     }));
 
+    // Draw the route polyline
     const polyline = new google.maps.Polyline({
       path: path,
       geodesic: true,
@@ -790,6 +878,29 @@
     });
 
     routePolylines[vehicle.id] = polyline;
+
+    // Add destination marker
+    const destPos = path[path.length - 1];
+    const destMarker = new google.maps.Marker({
+      position: destPos,
+      map: googleMap,
+      icon: {
+        path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+        scale: 6,
+        fillColor: "#10b981",
+        fillOpacity: 1,
+        strokeColor: "white",
+        strokeWeight: 2,
+        rotation: 180,
+      },
+      title: "Destination",
+    });
+
+    // Store destination marker to clean up later
+    if (!window.destMarkers) window.destMarkers = {};
+    if (window.destMarkers[vehicle.id])
+      window.destMarkers[vehicle.id].setMap(null);
+    window.destMarkers[vehicle.id] = destMarker;
 
     // Fit bounds to route
     const bounds = new google.maps.LatLngBounds();
@@ -939,11 +1050,19 @@
       setTimeout(() => toast.remove(), 300);
     }, 3000);
   }
+
+  // Fallback: If Google Maps API doesn't load within 10 seconds, show error
+  setTimeout(() => {
+    if (!mapInitialized && typeof google === "undefined") {
+      handleMapError();
+    }
+  }, 10000);
 </script>
 
 <script
-  src="https://maps.googleapis.com/maps/api/js?key=your_api_key&callback=initializeMap&loading=async"
+  src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&libraries=places,geometry&callback=initializeMap&loading=async"
   async
   defer
+  onerror="handleMapError()"
 ></script>
 {% endblock %}
